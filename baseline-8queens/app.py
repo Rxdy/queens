@@ -1,6 +1,5 @@
 """
-Baseline Queens Solver API
-Modèle neuronal (MLP one-shot) pour la résolution des 8-Reines
+Baseline Queens Solver API - Modèle heuristique léger (sans PyTorch)
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,8 +8,8 @@ from api.routes import router
 
 app = FastAPI(
     title="Baseline Queens Solver API",
-    description="Modèle basique (réseau de neurones MLP) pour la résolution des 8-Reines",
-    version="1.0.0",
+    description="Modèle heuristique (greedy + local search) pour la résolution des N-Reines",
+    version="2.0.0",
 )
 
 app.add_middleware(
