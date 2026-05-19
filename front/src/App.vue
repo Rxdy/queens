@@ -61,7 +61,12 @@ const initializeZones = () => {
         Array(size.value).fill(-1)
     ); // -1 pour cases vides
     positions.value = [];
+    solutions.value = [];
+    selectedHistoryIndex.value = -1;
+    trmPerformance.value = null;
+    baselineResult.value = null;
     errorMessage.value = ""; // Vider le message d'erreur
+    isPainting.value = false;
     // Réinitialiser la couleur sélectionnée si elle dépasse la limite
     if (selectedColor.value >= size.value) {
         selectedColor.value = 0;
