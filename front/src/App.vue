@@ -10,6 +10,8 @@ const selectedColor = ref(0);
 const errorMessage = ref("");
 const history = ref([]);
 const historyVisible = ref(true);
+const trmPerformance = ref(null);
+const baselineResult = ref(null);
 
 const isMobile = computed(() => windowWidth.value < 600);
 const currentSolutionIndex = ref(0);
@@ -75,6 +77,8 @@ const clickCell = (row, col) => {
     solutions.value = []; // Vider les solutions
     currentSolutionIndex.value = 0;
     selectedHistoryIndex.value = -1; // Désélectionner l'historique
+    trmPerformance.value = null;
+    baselineResult.value = null;
 };
 
 const onMouseDown = (row, col) => {
@@ -91,6 +95,20 @@ const onMouseEnter = (row, col) => {
 const onMouseUp = () => {
     isPainting.value = false;
 };
+
+const formatTime = (seconds) => {
+    if (seconds === null || seconds === undefined) return "—";
+    if (seconds < 0.001) return `${(seconds * 1_000_000).toFixed(0)} µs`;
+    if (seconds < 1) return `${(seconds * 1000).toFixed(3)} ms`;
+    return `${seconds.toFixed(3)} s`;
+};
+
+const speedup = computed(() => {
+    const trmTime = trmPerformance.value?.execution_time;
+    const baseTime = baselineResult.value?.performance?.execution_time;
+    if (!trmTime || !baseTime || !baselineResult.value?.supported) return null;
+    return (trmTime / baseTime).toFixed(1);
+});
 
 const submit = async () => {
     // Créer un mapping des couleurs utilisées vers des identifiants de zones
@@ -117,12 +135,21 @@ const submit = async () => {
         zones: zoneGrid,
     };
 
-    try {
-        const response = await axios.post(
-            "http://localhost:8000/api/solve",
-            payload
-        );
-        solutions.value = response.data.solutions;
+    // Réinitialiser les données de comparaison
+    trmPerformance.value = null;
+    baselineResult.value = null;
+
+    // Lancer les deux modèles en parallèle
+    const [trmRes, baselineRes] = await Promise.allSettled([
+        axios.post("http://localhost:8000/api/solve", payload),
+        axios.post("http://localhost:8001/api/solve", payload),
+    ]);
+
+    // Traitement TRM
+    if (trmRes.status === "fulfilled") {
+        const data = trmRes.value.data;
+        solutions.value = data.solutions;
+        trmPerformance.value = data.performance;
 
         if (solutions.value.length === 0) {
             errorMessage.value =
@@ -131,21 +158,25 @@ const submit = async () => {
         } else {
             errorMessage.value = "";
             currentSolutionIndex.value = 0;
-            positions.value = solutions.value[0]; // Charger la première solution par défaut
-            // Ajouter à l'historique
+            positions.value = solutions.value[0];
             history.value.unshift({
-                grid: zones.value.map((row) => [...row]), // Copie profonde
-                solutions: solutions.value.map((sol) => [...sol]), // Copie
+                grid: zones.value.map((row) => [...row]),
+                solutions: solutions.value.map((sol) => [...sol]),
                 timestamp: new Date().toLocaleString("fr-FR"),
                 size: size.value,
             });
         }
-    } catch (error) {
-        console.error(error);
+    } else {
+        console.error(trmRes.reason);
         positions.value = [];
         solutions.value = [];
         errorMessage.value =
             "Erreur lors de la résolution. Vérifiez que le serveur backend fonctionne.";
+    }
+
+    // Traitement Baseline
+    if (baselineRes.status === "fulfilled") {
+        baselineResult.value = baselineRes.value.data;
     }
 };
 
@@ -229,6 +260,8 @@ const resetGrid = () => {
     currentSolutionIndex.value = 0;
     selectedHistoryIndex.value = -1;
     isPainting.value = false;
+    trmPerformance.value = null;
+    baselineResult.value = null;
 };
 
 const loadSolution = (index) => {
@@ -433,6 +466,45 @@ initializeHistoryVisibility();
                         >
                     </div>
                 </div>
+
+                <!-- Panneau de comparaison des modèles -->
+                <div v-if="trmPerformance || baselineResult" class="comparison-panel">
+                    <h4 class="comparison-title">⚡ Comparaison des modèles</h4>
+                    <div class="comparison-rows">
+                        <div class="comparison-row">
+                            <span class="model-label trm-label">TRM (récursif)</span>
+                            <span class="model-time">{{ formatTime(trmPerformance?.execution_time) }}</span>
+                            <span class="model-badge valid-badge">
+                                ✓ {{ trmPerformance?.solutions_count ?? 0 }} sol.
+                            </span>
+                        </div>
+                        <div class="comparison-row">
+                            <span class="model-label baseline-label">Baseline (MLP)</span>
+                            <template v-if="baselineResult?.supported === false">
+                                <span class="model-time muted">N/A</span>
+                                <span class="model-badge unsupported-badge">8x8 uniquement</span>
+                            </template>
+                            <template v-else-if="baselineResult?.performance">
+                                <span class="model-time">{{ formatTime(baselineResult.performance.execution_time) }}</span>
+                                <span class="model-badge" :class="baselineResult.performance.valid ? 'valid-badge' : 'invalid-badge'">
+                                    {{ baselineResult.performance.valid ? '✓ Valide' : `✗ ${baselineResult.performance.conflicts} conflit(s)` }}
+                                </span>
+                            </template>
+                            <template v-else>
+                                <span class="model-time muted">—</span>
+                            </template>
+                        </div>
+                    </div>
+                    <div v-if="speedup !== null" class="speedup-info">
+                        <template v-if="Number(speedup) >= 1">
+                            Le baseline est <strong>{{ speedup }}×</strong> plus rapide que TRM
+                        </template>
+                        <template v-else>
+                            TRM est <strong>{{ (1 / Number(speedup)).toFixed(1) }}×</strong> plus rapide que le baseline
+                        </template>
+                    </div>
+                </div>
+
                 <button
                     @click="submit"
                     class="solve-btn"
@@ -747,6 +819,77 @@ body {
     font-size: 0.9rem;
     text-align: center;
     max-width: 80vw;
+}
+
+/* --- Panneau de comparaison des modèles --- */
+.comparison-panel {
+    margin-top: 1.2vh;
+    padding: 1vh 1.2vw;
+    background: #f0f4ff;
+    border: 1px solid #c5cfe8;
+    border-radius: 8px;
+    min-width: 260px;
+    max-width: 420px;
+}
+
+.comparison-title {
+    margin: 0 0 0.8vh 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #3a3a3a;
+}
+
+.comparison-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5vh;
+}
+
+.comparison-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5vw;
+    font-size: 0.82rem;
+}
+
+.model-label {
+    flex: 0 0 140px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.trm-label { color: #1565c0; }
+.baseline-label { color: #6a1b9a; }
+
+.model-time {
+    flex: 0 0 80px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    text-align: right;
+    color: #222;
+}
+
+.model-time.muted { color: #999; }
+
+.model-badge {
+    flex: 1;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.valid-badge     { background: #e8f5e9; color: #2e7d32; }
+.invalid-badge   { background: #ffebee; color: #c62828; }
+.unsupported-badge { background: #fff3e0; color: #e65100; }
+
+.speedup-info {
+    margin-top: 0.8vh;
+    font-size: 0.78rem;
+    color: #555;
+    border-top: 1px solid #d0d8f0;
+    padding-top: 0.6vh;
 }
 
 .sidebar {

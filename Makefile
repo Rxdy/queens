@@ -15,7 +15,7 @@ check-docker:
 
 # Commandes Docker Compose (dépendances installées automatiquement dans les containers)
 up: check-docker
-	docker-compose up
+	docker compose up
 
 down:
 	docker-compose down
