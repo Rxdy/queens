@@ -1,4 +1,4 @@
-.PHONY: up down build run stop logs clean check-docker help
+.PHONY: up down build run stop logs clean services status check-docker help
 
 # Vérifier que Docker et Docker Compose sont disponibles
 check-docker:
@@ -36,16 +36,45 @@ clean:
 	docker-compose down -v
 	docker system prune -f
 
+# État des services
+services:
+	@echo "📊 État des services:"
+	@echo ""
+	@echo "Frontend:"
+	@if docker compose ps queens 2>/dev/null | grep -q "Up"; then \
+		echo "  ✅ UP   → http://localhost:5173"; \
+	else \
+		echo "  🔴 DOWN → http://localhost:5173"; \
+	fi
+	@echo ""
+	@echo "Backend TRM:"
+	@if docker compose ps trm-solveur 2>/dev/null | grep -q "Up"; then \
+		echo "  ✅ UP   → http://localhost:8000"; \
+	else \
+		echo "  🔴 DOWN → http://localhost:8000"; \
+	fi
+	@echo ""
+	@echo "Backend Baseline:"
+	@if docker compose ps baseline-solveur 2>/dev/null | grep -q "Up"; then \
+		echo "  ✅ UP   → http://localhost:8001"; \
+	else \
+		echo "  🔴 DOWN → http://localhost:8001"; \
+	fi
+	@echo ""
+
+status: services
+
 # Aide
 help:
 	@echo "🎯 Commandes disponibles :"
-	@echo "  make up     - Démarrer les services (dépendances installées automatiquement)"
-	@echo "  make down   - Arrêter les services"
-	@echo "  make build  - Construire les images"
+	@echo "  make up     - Démarrer les services (logs visibles)"
 	@echo "  make run    - Démarrer en arrière-plan"
+	@echo "  make down   - Arrêter et supprimer les containers"
 	@echo "  make stop   - Arrêter les services"
-	@echo "  make logs   - Afficher les logs"
-	@echo "  make clean  - Nettoyer les containers et volumes"
+	@echo "  make logs   - Afficher les logs en temps réel"
+	@echo "  make services - État et URLs des services"
+	@echo "  make build  - Construire/reconstruire les images"
+	@echo "  make clean  - Nettoyer complètement (containers + volumes)"
 	@echo "  make help   - Afficher cette aide"
 	@echo ""
 	@echo "📦 Aucune dépendance n'est requise sur votre machine !"
