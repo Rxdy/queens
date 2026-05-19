@@ -50,7 +50,7 @@ class QueensSolver:
         
         return True
     
-    def solve(self, size: int, zones: List[List[int]]) -> Tuple[List[List[List[int]]], int]:
+    def solve(self, rows: int,cols:int, zones: List[List[int]]) -> Tuple[List[List[List[int]]], int]:
         """
         Résout le problème des Queens avec contraintes de zones par backtracking.
         

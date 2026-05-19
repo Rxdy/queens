@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import axios from "axios";
+import { parseMatrix } from "./services/matrixParser";
 
-const size = ref(8);
+const matrixInput = ref("");
+const rows = ref(8);
+const cols = ref(8);
 const zones = ref([]);
 const positions = ref([]);
 const solutions = ref([]);
@@ -43,7 +46,7 @@ const availableColors = computed(() => {
     const usedColorsInGrid = new Set(
         zones.value.flat().filter((cell) => cell !== -1)
     );
-    const maxColors = size.value;
+    const maxColors = rows.value;
 
     if (usedColorsInGrid.size < maxColors) {
         // On peut encore ajouter des couleurs, toutes sont disponibles
@@ -55,13 +58,13 @@ const availableColors = computed(() => {
 });
 
 const initializeZones = () => {
-    zones.value = Array.from({ length: size.value }, () =>
-        Array(size.value).fill(-1)
+    zones.value = Array.from({ length: rows.value }, () =>
+        Array(cols.value).fill(-1)
     ); // -1 pour cases vides
     positions.value = [];
     errorMessage.value = ""; // Vider le message d'erreur
     // Réinitialiser la couleur sélectionnée si elle dépasse la limite
-    if (selectedColor.value >= size.value) {
+    if (selectedColor.value >= rows.value) {
         selectedColor.value = 0;
     }
 };
@@ -130,10 +133,13 @@ const submit = async () => {
         row.map((cell) => (cell === -1 ? -1 : colorToZoneMap.get(cell)))
     );
 
+
     const payload = {
-        size: size.value,
+        rows: rows.value,
+        cols: cols.value,
         zones: zoneGrid,
     };
+
 
     // Réinitialiser les données de comparaison
     trmPerformance.value = null;
@@ -163,7 +169,9 @@ const submit = async () => {
                 grid: zones.value.map((row) => [...row]),
                 solutions: solutions.value.map((sol) => [...sol]),
                 timestamp: new Date().toLocaleString("fr-FR"),
-                size: size.value,
+                rows: rows.value,
+                cols: cols.value
+
             });
         }
     } else {
@@ -188,7 +196,7 @@ const isGridComplete = computed(() => {
     const usedColorsCount = new Set(
         zones.value.flat().filter((cell) => cell !== -1)
     ).size;
-    const requiredColors = size.value;
+    const requiredColors = rows.value;
 
     return allCellsFilled && usedColorsCount === requiredColors;
 });
@@ -229,14 +237,14 @@ const getCellStyle = (row, col) => {
     }
 
     // Bordure du bas - épaisse si voisin différent
-    if (row < size.value - 1) {
+    if (row < rows.value - 1) {
         if (zones.value[row + 1][col] !== currentColor) {
             borderBottom = "3px solid #000";
         }
     }
 
     // Bordure de droite - épaisse si voisin différent
-    if (col < size.value - 1) {
+    if (col < cols.value - 1) {
         if (zones.value[row][col + 1] !== currentColor) {
             borderRight = "3px solid #000";
         }
@@ -270,15 +278,15 @@ const loadSolution = (index) => {
 };
 
 const loadFromHistory = (entry, index) => {
-    // Restaurer la grille depuis l'historique
     zones.value = entry.grid.map((row) => [...row]);
     solutions.value = entry.solutions.map((sol) => [...sol]);
-    size.value = entry.size;
+    rows.value = entry.rows;
+    cols.value = entry.cols;
     positions.value = solutions.value[0] || [];
     currentSolutionIndex.value = 0;
     errorMessage.value = "";
     selectedHistoryIndex.value = index;
-    isPainting.value = false; // Réinitialiser l'état de painting
+    isPainting.value = false;
 };
 
 const toggleHistory = () => {
@@ -297,11 +305,11 @@ const cellSize = computed(() => {
     // Calculer l'espace nécessaire pour les bordures
     // Bordure extérieure de la grille: 3px * 2 = 6px (avec box-sizing: border-box, c'est déjà inclus)
     // Bordures intermédiaires des cellules: environ (n-1) * 1px pour chaque dimension
-    const borderSpace = (size.value - 1) * 1;
+    const borderSpace = Math.max(rows.value, cols.value) - 1;
 
     // Taille maximale possible pour une case en tenant compte des bordures
-    const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
-    const maxCellSizeHeight = (availableHeight - borderSpace - 6) / size.value;
+    const maxCellSizeWidth = (availableWidth - borderSpace - 6) / cols.value;
+    const maxCellSizeHeight = (availableHeight - borderSpace - 6) / rows.value;
     const maxCellSize = Math.min(maxCellSizeWidth, maxCellSizeHeight);
 
     // Limiter entre 20px et 60px pour une bonne lisibilité
@@ -345,6 +353,28 @@ const initializeHistoryVisibility = () => {
     }
 };
 
+const loadMatrix = () => {
+    try {
+        const { matrix, rows: r, cols: c } = parseMatrix(matrixInput.value);
+
+        rows.value = r;
+        cols.value = c;
+
+        zones.value = matrix;
+
+        positions.value = [];
+        solutions.value = [];
+        errorMessage.value = "";
+        currentSolutionIndex.value = 0;
+        selectedHistoryIndex.value = -1;
+        trmPerformance.value = null;
+        baselineResult.value = null;
+
+    } catch (err) {
+        errorMessage.value = err.message;
+    }
+};
+
 // Watcher pour réagir aux changements de taille d'écran
 watch(isMobile, (newIsMobile) => {
     if (newIsMobile && historyVisible.value) {
@@ -368,17 +398,10 @@ initializeHistoryVisibility();
                     Aucune grille résolue
                 </div>
                 <div v-else class="history-list">
-                    <div
-                        v-for="(entry, index) in history"
-                        :key="index"
-                        class="history-entry"
-                        :class="{ selected: selectedHistoryIndex === index }"
-                        @click="loadFromHistory(entry, index)"
-                    >
+                    <div v-for="(entry, index) in history" :key="index" class="history-entry"
+                        :class="{ selected: selectedHistoryIndex === index }" @click="loadFromHistory(entry, index)">
                         <div class="history-entry-header">
-                            <span class="history-entry-title"
-                                >{{ entry.size }}x{{ entry.size }}</span
-                            >
+                            <span class="history-entry-title">{{ entry.rows }}x{{ entry.cols }}</span>
                             <span class="history-entry-time">{{
                                 entry.timestamp
                             }}</span>
@@ -393,55 +416,30 @@ initializeHistoryVisibility();
             </div>
             <div class="grid-container">
                 <div class="grid-header">
-                    <button
-                        v-if="windowWidth < 600"
-                        @click="toggleHistory"
-                        class="toggle-history-btn"
-                    >
+                    <button v-if="windowWidth < 600" @click="toggleHistory" class="toggle-history-btn">
                         {{ historyVisible ? "Masquer" : "Afficher" }}
                         l'historique
                     </button>
                 </div>
-                <div
-                    class="grid"
-                    :style="{
-                        gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
-                        width: `${cellSize * size}px`,
-                        height: `${cellSize * size}px`,
-                    }"
-                    @mouseup="onMouseUp"
-                >
-                    <div
-                        v-for="(row, r) in zones"
-                        :key="r"
-                        style="display: contents"
-                    >
-                        <div
-                            v-for="(cell, c) in row"
-                            :key="c"
-                            class="cell"
-                            :style="getCellStyle(r, c)"
-                            @mousedown="onMouseDown(r, c)"
-                            @mouseenter="onMouseEnter(r, c)"
-                            @mouseup="onMouseUp"
-                        >
-                            <svg
-                                v-if="
-                                    positions.some(
-                                        (p) => p[0] === r && p[1] === c
-                                    )
-                                "
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 640 640"
-                                class="queen-icon"
-                                :style="{
-                                    width: queenIconSize + 'px',
-                                    height: queenIconSize + 'px',
-                                }"
-                            >
+                <div class="grid" :style="{
+                    gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+                    gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
+                    width: `${cellSize * cols}px`,
+                    height: `${cellSize * rows}px`,
+                }" @mouseup="onMouseUp">
+                    <div v-for="(row, r) in zones" :key="r" style="display: contents">
+                        <div v-for="(cell, c) in row" :key="c" class="cell" :style="getCellStyle(r, c)"
+                            @mousedown="onMouseDown(r, c)" @mouseenter="onMouseEnter(r, c)" @mouseup="onMouseUp">
+                            <svg v-if="
+                                positions.some(
+                                    (p) => p[0] === r && p[1] === c
+                                )
+                            " xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="queen-icon" :style="{
+                                width: queenIconSize + 'px',
+                                height: queenIconSize + 'px',
+                            }">
                                 <path
-                                    d="M320 144C346.5 144 368 122.5 368 96C368 69.5 346.5 48 320 48C293.5 48 272 69.5 272 96C272 122.5 293.5 144 320 144zM69.5 249L192 448L135.8 518.3C130.8 524.6 128 532.4 128 540.5C128 560.1 143.9 576 163.5 576L476.4 576C496 576 511.9 560.1 511.9 540.5C511.9 532.4 509.2 524.6 504.1 518.3L448 448L570.5 249C574.1 243.1 576 236.3 576 229.4L576 228.8C576 208.5 559.5 192 539.2 192C531.9 192 524.8 194.2 518.8 198.2L501.9 209.5C489.2 218 472.3 216.3 461.5 205.5L427.4 171.4C420.1 164.1 410.2 160 400 160C389.8 160 379.9 164.1 372.7 171.3L342.6 201.4C330.1 213.9 309.8 213.9 297.3 201.4L267.2 171.3C260.1 164.1 250.2 160 240 160C229.8 160 219.9 164.1 212.7 171.3L178.6 205.4C167.8 216.2 150.9 217.9 138.2 209.4L121.3 198.2C115.2 194.2 108.1 192 100.9 192C80.6 192 64.1 208.5 64.1 228.8L64.1 229.4C64.1 236.3 66 243.1 69.6 249z"
-                                />
+                                    d="M320 144C346.5 144 368 122.5 368 96C368 69.5 346.5 48 320 48C293.5 48 272 69.5 272 96C272 122.5 293.5 144 320 144zM69.5 249L192 448L135.8 518.3C130.8 524.6 128 532.4 128 540.5C128 560.1 143.9 576 163.5 576L476.4 576C496 576 511.9 560.1 511.9 540.5C511.9 532.4 509.2 524.6 504.1 518.3L448 448L570.5 249C574.1 243.1 576 236.3 576 229.4L576 228.8C576 208.5 559.5 192 539.2 192C531.9 192 524.8 194.2 518.8 198.2L501.9 209.5C489.2 218 472.3 216.3 461.5 205.5L427.4 171.4C420.1 164.1 410.2 160 400 160C389.8 160 379.9 164.1 372.7 171.3L342.6 201.4C330.1 213.9 309.8 213.9 297.3 201.4L267.2 171.3C260.1 164.1 250.2 160 240 160C229.8 160 219.9 164.1 212.7 171.3L178.6 205.4C167.8 216.2 150.9 217.9 138.2 209.4L121.3 198.2C115.2 194.2 108.1 192 100.9 192C80.6 192 64.1 208.5 64.1 228.8L64.1 229.4C64.1 236.3 66 243.1 69.6 249z" />
                             </svg>
                         </div>
                     </div>
@@ -452,18 +450,12 @@ initializeHistoryVisibility();
                         <strong>{{ solutions.length }}</strong>
                     </p>
                     <div v-if="solutions.length > 1" class="solution-buttons">
-                        <button
-                            v-for="(sol, idx) in solutions.slice(0, 5)"
-                            :key="idx"
-                            @click="loadSolution(idx)"
-                            class="solution-btn"
-                            :class="{ active: currentSolutionIndex === idx }"
-                        >
+                        <button v-for="(sol, idx) in solutions.slice(0, 5)" :key="idx" @click="loadSolution(idx)"
+                            class="solution-btn" :class="{ active: currentSolutionIndex === idx }">
                             Solution {{ idx + 1 }}
                         </button>
-                        <span v-if="solutions.length > 5" class="more-solutions"
-                            >... et {{ solutions.length - 5 }} autres</span
-                        >
+                        <span v-if="solutions.length > 5" class="more-solutions">... et {{ solutions.length - 5 }}
+                            autres</span>
                     </div>
                 </div>
 
@@ -485,9 +477,12 @@ initializeHistoryVisibility();
                                 <span class="model-badge unsupported-badge">8x8 uniquement</span>
                             </template>
                             <template v-else-if="baselineResult?.performance">
-                                <span class="model-time">{{ formatTime(baselineResult.performance.execution_time) }}</span>
-                                <span class="model-badge" :class="baselineResult.performance.valid ? 'valid-badge' : 'invalid-badge'">
-                                    {{ baselineResult.performance.valid ? '✓ Valide' : `✗ ${baselineResult.performance.conflicts} conflit(s)` }}
+                                <span class="model-time">{{ formatTime(baselineResult.performance.execution_time)
+                                }}</span>
+                                <span class="model-badge"
+                                    :class="baselineResult.performance.valid ? 'valid-badge' : 'invalid-badge'">
+                                    {{ baselineResult.performance.valid ? '✓ Valide' : `✗
+                                    ${baselineResult.performance.conflicts} conflit(s)` }}
                                 </span>
                             </template>
                             <template v-else>
@@ -505,11 +500,7 @@ initializeHistoryVisibility();
                     </div>
                 </div>
 
-                <button
-                    @click="submit"
-                    class="solve-btn"
-                    :disabled="!isGridComplete"
-                >
+                <button @click="submit" class="solve-btn" :disabled="!isGridComplete">
                     Résoudre
                 </button>
                 <button @click="resetGrid" class="reset-btn">
@@ -521,26 +512,25 @@ initializeHistoryVisibility();
             </div>
             <div class="sidebar">
                 <div class="size-selector">
-                    <label>Taille:</label>
-                    <select v-model.number="size" @change="initializeZones">
-                        <option
-                            v-for="s in [4, 5, 6, 7, 8, 9, 10, 11, 12]"
-                            :key="s"
-                            :value="s"
-                        >
-                            {{ s }}x{{ s }}
-                        </option>
-                    </select>
+                    <label>Lignes:</label>
+                    <input type="number" v-model="rows" />
+
+                    <label>Colonnes:</label>
+                    <input type="number" v-model="cols" />
                 </div>
                 <div class="palette">
-                    <div
-                        v-for="(color, index) in availableColors"
-                        :key="index"
-                        class="color-btn"
-                        :class="{ selected: selectedColor === index }"
-                        :style="{ backgroundColor: color }"
-                        @click="selectedColor = index"
-                    ></div>
+                    <div v-for="(color, index) in availableColors" :key="index" class="color-btn"
+                        :class="{ selected: selectedColor === index }" :style="{ backgroundColor: color }"
+                        @click="selectedColor = index"></div>
+                </div>
+                <div class="matrix-input">
+                    <h4>Importer une matrice</h4>
+                    <textarea v-model="matrixInput" placeholder="Ex:
+                            0 0 1
+                            0 2 2
+                            1 1 2">
+        </textarea>
+                    <button @click="loadMatrix">Charger</button>
                 </div>
             </div>
         </div>
@@ -754,7 +744,6 @@ body {
     border: 5px solid #000;
     background-color: white;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    aspect-ratio: 1;
     box-sizing: border-box;
     overflow: hidden;
     flex-shrink: 0;
@@ -858,8 +847,13 @@ body {
     white-space: nowrap;
 }
 
-.trm-label { color: #1565c0; }
-.baseline-label { color: #6a1b9a; }
+.trm-label {
+    color: #1565c0;
+}
+
+.baseline-label {
+    color: #6a1b9a;
+}
 
 .model-time {
     flex: 0 0 80px;
@@ -869,7 +863,9 @@ body {
     color: #222;
 }
 
-.model-time.muted { color: #999; }
+.model-time.muted {
+    color: #999;
+}
 
 .model-badge {
     flex: 1;
@@ -880,9 +876,20 @@ body {
     white-space: nowrap;
 }
 
-.valid-badge     { background: #e8f5e9; color: #2e7d32; }
-.invalid-badge   { background: #ffebee; color: #c62828; }
-.unsupported-badge { background: #fff3e0; color: #e65100; }
+.valid-badge {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.invalid-badge {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.unsupported-badge {
+    background: #fff3e0;
+    color: #e65100;
+}
 
 .speedup-info {
     margin-top: 0.8vh;
@@ -972,10 +979,12 @@ body {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25),
             0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(59, 130, 246, 0.5);
     }
+
     50% {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25),
             0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 8px rgba(59, 130, 246, 0);
     }
+
     100% {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25),
             0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(59, 130, 246, 0);

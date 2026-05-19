@@ -1,6 +1,8 @@
 """
 Routes API pour TRM Solver
 """
+from matplotlib.pyplot import grid
+
 from fastapi import APIRouter, HTTPException
 import logging
 import time
@@ -28,28 +30,35 @@ async def solve(grid: GridInput):
         Solutions trouvées avec métriques de performance
     """
     try:
-        logger.info(f"🔍 Reçu grille de taille {grid.size}")
+        logger.info(f"🔍 Reçu grille de taille {grid.rows}x{grid.cols}")
         logger.debug("📊 Grille des zones:")
         for i, row in enumerate(grid.zones):
             logger.debug(f"   Ligne {i}: {row}")
         
         # Validation de la grille
-        if len(grid.zones) != grid.size:
+        if len(grid.zones) != grid.rows:
             raise HTTPException(
                 status_code=400,
-                detail=f"La grille doit avoir {grid.size} lignes, reçu {len(grid.zones)}"
+                detail=f"La grille doit avoir {grid.rows} lignes, reçu {len(grid.zones)}"
             )
         
         for i, row in enumerate(grid.zones):
-            if len(row) != grid.size:
+            if len(row) != grid.cols:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"La ligne {i} doit avoir {grid.size} colonnes, reçu {len(row)}"
+                    detail=f"La ligne {i} doit avoir {grid.cols} colonnes, reçu {len(row)}"
                 )
         
+        
+        if grid.rows > grid.cols:
+            raise HTTPException(
+                status_code=400,
+                detail="Impossible: plus de lignes que de colonnes"
+            )
+            
         # Résolution
         start_time = time.time()
-        solutions, iterations = solver.solve(grid.size, grid.zones)
+        solutions, iterations = solver.solve(grid.rows, grid.cols, grid.zones)
         end_time = time.time()
         
         execution_time = end_time - start_time
