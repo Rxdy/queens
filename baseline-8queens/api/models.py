@@ -17,7 +17,7 @@ class BaselinePerformance(BaseModel):
 
 
 class BaselineSolution(BaseModel):
-    supported: bool = Field(..., description="Ce modèle supporte-t-il cette taille de grille?")
+    supported: bool = Field(..., description="La taille de grille est-elle supportée?")
     solution: Optional[List[List[int]]] = Field(None, description="Solution prédite [[row, col], ...]")
     performance: Optional[BaselinePerformance] = None
     error: Optional[str] = None

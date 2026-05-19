@@ -482,7 +482,7 @@ initializeHistoryVisibility();
                             <span class="model-label baseline-label">Baseline (MLP)</span>
                             <template v-if="baselineResult?.supported === false">
                                 <span class="model-time muted">N/A</span>
-                                <span class="model-badge unsupported-badge">8x8 uniquement</span>
+                                <span class="model-badge unsupported-badge">❌ Erreur</span>
                             </template>
                             <template v-else-if="baselineResult?.performance">
                                 <span class="model-time">{{ formatTime(baselineResult.performance.execution_time) }}</span>

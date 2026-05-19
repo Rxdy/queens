@@ -13,73 +13,84 @@ from src.metrics import count_conflicts
 
 router = APIRouter()
 
-_model: QueensBaseline | None = None
+_models: dict[int, QueensBaseline] = {}  # Cache de modèles par taille
 _CKPT_PATH = os.path.join(os.path.dirname(__file__), "..", "outputs", "best.pt")
 
 
-def _load_model() -> QueensBaseline:
-    global _model
-    if _model is not None:
-        return _model
+def _load_model(n: int) -> QueensBaseline:
+    """
+    Charger ou créer un modèle pour la taille n.
+    - Si n=8 et checkpoint existe: charger les poids pré-entraînés
+    - Sinon: créer un nouveau modèle avec initialisation aléatoire
+    """
+    if n in _models:
+        return _models[n]
 
-    m = QueensBaseline()
-    checkpoint = torch.load(_CKPT_PATH, map_location="cpu", weights_only=True)
+    m = QueensBaseline(n=n)
 
-    if isinstance(checkpoint, dict):
-        # Format sauvegardé par train.py : {"model_state": ..., "config": ..., ...}
-        if "model_state" in checkpoint:
-            m.load_state_dict(checkpoint["model_state"])
-        elif "model_state_dict" in checkpoint:
-            m.load_state_dict(checkpoint["model_state_dict"])
-        elif "state_dict" in checkpoint:
-            m.load_state_dict(checkpoint["state_dict"])
-        else:
-            # Tentative de chargement direct (OrderedDict de poids)
-            m.load_state_dict(checkpoint)
-    else:
-        m.load_state_dict(checkpoint)
+    # Charger les poids du checkpoint uniquement pour n=8
+    if n == 8 and os.path.exists(_CKPT_PATH):
+        try:
+            checkpoint = torch.load(_CKPT_PATH, map_location="cpu", weights_only=True)
+
+            if isinstance(checkpoint, dict):
+                # Format sauvegardé par train.py : {"model_state": ..., "config": ..., ...}
+                if "model_state" in checkpoint:
+                    m.load_state_dict(checkpoint["model_state"])
+                elif "model_state_dict" in checkpoint:
+                    m.load_state_dict(checkpoint["model_state_dict"])
+                elif "state_dict" in checkpoint:
+                    m.load_state_dict(checkpoint["state_dict"])
+                else:
+                    # Tentative de chargement direct (OrderedDict de poids)
+                    m.load_state_dict(checkpoint)
+        except Exception as e:
+            print(f"Impossible de charger le checkpoint pour n=8: {e}")
+            # Continuer avec initialisation aléatoire
 
     m.eval()
-    _model = m
-    return _model
+    _models[n] = m
+    return _models[n]
 
 
 @router.post("/solve", response_model=BaselineSolution)
 async def solve(grid: GridInput):
     """
-    Résout les 8-Reines via inférence neuronale (one-shot MLP).
-    Ne supporte que les grilles 8x8. Les zones sont ignorées.
+    Résout les N-Reines via inférence neuronale (one-shot MLP).
+    Supporte n'importe quelle taille de grille (contrairement à la version 8x8).
     """
-    if grid.size != 8:
+    size = grid.size
+
+    try:
+        model = _load_model(size)
+
+        # Entrée entièrement inconnue (toutes les lignes à prédire)
+        x = torch.full((1, size), -1, dtype=torch.long)
+
+        start = time.perf_counter()
+        pred = model.predict(x)  # (1, size)
+        elapsed = time.perf_counter() - start
+
+        cols = pred[0].tolist()
+        solution = [[r, cols[r]] for r in range(size)]
+
+        conflicts = int(count_conflicts(cols))
+        valid = conflicts == 0
+
+        return BaselineSolution(
+            supported=True,
+            solution=solution,
+            performance=BaselinePerformance(
+                execution_time=elapsed,
+                valid=valid,
+                conflicts=conflicts,
+            ),
+        )
+    except Exception as e:
         return BaselineSolution(
             supported=False,
-            error=f"Le modèle baseline supporte uniquement les grilles 8x8 (reçu {grid.size}x{grid.size})",
+            error=f"Erreur lors de la résolution: {str(e)}",
         )
-
-    model = _load_model()
-
-    # Entrée entièrement inconnue (toutes les lignes à prédire)
-    x = torch.full((1, 8), -1, dtype=torch.long)
-
-    start = time.perf_counter()
-    pred = model.predict(x)  # (1, 8)
-    elapsed = time.perf_counter() - start
-
-    cols = pred[0].tolist()
-    solution = [[r, cols[r]] for r in range(8)]
-
-    conflicts = int(count_conflicts(cols))
-    valid = conflicts == 0
-
-    return BaselineSolution(
-        supported=True,
-        solution=solution,
-        performance=BaselinePerformance(
-            execution_time=elapsed,
-            valid=valid,
-            conflicts=conflicts,
-        ),
-    )
 
 
 @router.get("/health")
