@@ -538,9 +538,26 @@ const submit = async () => {
 
 // Vérifier si la grille est complètement remplie et utilise le bon nombre de couleurs
 const isGridComplete = computed(() => {
-    // Pour le problème des reines, la grille est toujours prête à être résolue
-    // L'utilisateur peut peindre des obstacles, mais ce n'est pas obligatoire
-    return zones.value && zones.value.length > 0;
+    if (!zones.value || zones.value.length !== size.value) {
+        return false;
+    }
+
+    return zones.value.every(
+        (row) =>
+            Array.isArray(row) &&
+            row.length === size.value &&
+            row.every((cell) => cell !== -1)
+    );
+});
+
+const hasGridData = computed(() => {
+    if (!zones.value || zones.value.length !== size.value) {
+        return false;
+    }
+
+    return zones.value.some(
+        (row) => Array.isArray(row) && row.some((cell) => cell !== -1)
+    );
 });
 
 const getCellStyle = (row, col) => {
@@ -991,6 +1008,7 @@ initializeHistoryVisibility();
                         </button>
                         <button
                             @click="resetGrid"
+                            :disabled="!hasGridData"
                             class="icon-btn reset-icon-btn"
                             title="Réinitialiser la grille"
                         >
@@ -1551,8 +1569,11 @@ body {
 }
 
 .icon-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.65;
     cursor: not-allowed;
+    background-color: #bdbdbd;
+    color: #fff;
+    box-shadow: none;
 }
 
 .icon-btn svg,
@@ -1565,13 +1586,43 @@ body {
 }
 
 .solve-icon-btn {
-    color: #1976d2;
-    border-color: rgba(25, 118, 210, 0.2);
+    background-color: #4caf50 !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+}
+
+.solve-icon-btn:hover:not(:disabled) {
+    background-color: #45a049 !important;
+    box-shadow: 0 3px 8px rgba(76, 175, 80, 0.5);
+}
+
+.solve-icon-btn:disabled {
+    background-color: #8bc34a !important;
+    color: #fff !important;
+    opacity: 0.65;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .reset-icon-btn {
-    color: #d32f2f;
-    border-color: rgba(211, 47, 47, 0.2);
+    background-color: #d32f2f !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
+}
+
+.reset-icon-btn:hover:not(:disabled) {
+    background-color: #c62828 !important;
+    box-shadow: 0 3px 8px rgba(211, 47, 47, 0.5);
+}
+
+.reset-icon-btn:disabled {
+    background-color: #ef9a9a !important;
+    color: #fff !important;
+    opacity: 0.65;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .grid {
@@ -1666,32 +1717,6 @@ body {
     background-color: #b71c1c;
 }
 
-.icon-btn {
-    width: 40px;
-    height: 40px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 50%;
-    background: #fff;
-    color: #333;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.icon-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    background-color: #f4f4f4;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
-}
-
-.icon-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .icon-btn svg {
     width: 20px;
     height: 20px;
@@ -1699,13 +1724,27 @@ body {
 }
 
 .benchmark-icon-btn {
-    color: #1565c0;
-    border-color: rgba(21, 101, 192, 0.2);
+    background-color: #1565c0;
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 6px rgba(21, 101, 192, 0.3);
+}
+
+.benchmark-icon-btn:hover:not(:disabled) {
+    background-color: #1144a0;
+    box-shadow: 0 3px 8px rgba(21, 101, 192, 0.5);
 }
 
 .import-icon-btn {
-    color: #6a1b9a;
-    border-color: rgba(106, 27, 154, 0.2);
+    background-color: #9c27b0;
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 6px rgba(156, 39, 176, 0.3);
+}
+
+.import-icon-btn:hover:not(:disabled) {
+    background-color: #7b1fa2;
+    box-shadow: 0 3px 8px rgba(156, 39, 176, 0.5);
 }
 
 .benchmark-status {
