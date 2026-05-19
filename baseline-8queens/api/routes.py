@@ -9,32 +9,35 @@ from src.greedy_model import QueensGreedyBaseline
 
 router = APIRouter()
 
-# Instance du modèle heuristique
+# Instance du modèle baseline
 _model = QueensGreedyBaseline()
 
 
 @router.post("/solve", response_model=BaselineSolution)
 async def solve(grid: GridInput):
     """
-    Résout les N-Reines via heuristique greedy + local search (très rapide).
-    Supporte n'importe quelle taille de grille.
+    Résout les N-Reines par backtracking naïf exhaustif (sans optimisations).
+    Trouve TOUTES les solutions comme le TRM, pour une comparaison équitable.
     """
     size = grid.size
+    zones = grid.zones
 
     try:
         start = time.perf_counter()
-        solution, conflicts = _model.solve(size)
+        all_solutions, first_solution, count = _model.solve_exhaustive(size, zones)
         elapsed = time.perf_counter() - start
 
-        valid = conflicts == 0
+        valid = count > 0
 
         return BaselineSolution(
             supported=True,
-            solution=solution,
+            solution=first_solution,
+            solutions=all_solutions,
             performance=BaselinePerformance(
                 execution_time=elapsed,
                 valid=valid,
-                conflicts=conflicts,
+                conflicts=0 if valid else 1,
+                solutions_count=count,
             ),
         )
     except Exception as e:

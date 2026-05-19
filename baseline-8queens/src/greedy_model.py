@@ -14,6 +14,55 @@ class QueensGreedyBaseline:
     
     def __init__(self, seed: int = 42):
         random.seed(seed)
+
+    def solve_exhaustive(self, n: int, zones: list) -> tuple:
+        """
+        Backtracking naïf exhaustif : trouve TOUTES les solutions avec contrainte de zones.
+        Identique au TRM en termes de résultat, mais sans ses optimisations.
+        Zone constraint : une seule reine par zone (couleur).
+        """
+        all_solutions = []
+        placement = [-1] * n
+        used_cols = [False] * n
+        used_zones = set()
+
+        def backtrack(row: int):
+            if row == n:
+                all_solutions.append([[i, placement[i]] for i in range(n)])
+                return
+            for col in range(n):
+                if used_cols[col]:
+                    continue
+                # Contrainte de zone
+                zone = zones[row][col] if zones and row < len(zones) and col < len(zones[row]) else -1
+                if zone != -1 and zone in used_zones:
+                    continue
+                # Contrainte d'adjacence (même règle que TRM) : pas de reines dans les 8 cases adjacentes
+                valid = True
+                for prev_row in range(row):
+                    dr = abs(placement[prev_row] - col)
+                    dc = abs(prev_row - row)
+                    if max(dr, dc) == 1:
+                        valid = False
+                        break
+                if not valid:
+                    continue
+                # Placer la reine
+                placement[row] = col
+                used_cols[col] = True
+                zone_added = zone != -1
+                if zone_added:
+                    used_zones.add(zone)
+                backtrack(row + 1)
+                # Retirer la reine
+                placement[row] = -1
+                used_cols[col] = False
+                if zone_added:
+                    used_zones.discard(zone)
+
+        backtrack(0)
+        first_solution = all_solutions[0] if all_solutions else []
+        return all_solutions, first_solution, len(all_solutions)
     
     def count_conflicts(self, placement: List[int]) -> int:
         """Compte le nombre de conflits (attaques) dans un placement."""

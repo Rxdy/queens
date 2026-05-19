@@ -11,13 +11,15 @@ class GridInput(BaseModel):
 
 
 class BaselinePerformance(BaseModel):
-    execution_time: float = Field(..., description="Temps d'inférence en secondes")
-    valid: bool = Field(..., description="La solution prédite est-elle valide (sans conflit)?")
-    conflicts: int = Field(..., description="Nombre de conflits dans la solution prédite")
+    execution_time: float = Field(..., description="Temps d'exécution en secondes")
+    valid: bool = Field(..., description="La solution est-elle valide (sans conflit)?")
+    conflicts: int = Field(..., description="Nombre de conflits dans la première solution")
+    solutions_count: int = Field(0, description="Nombre total de solutions trouvées")
 
 
 class BaselineSolution(BaseModel):
     supported: bool = Field(..., description="La taille de grille est-elle supportée?")
-    solution: Optional[List[List[int]]] = Field(None, description="Solution prédite [[row, col], ...]")
+    solution: Optional[List[List[int]]] = Field(None, description="Première solution [[row, col], ...]")
+    solutions: Optional[List[List[List[int]]]] = Field(None, description="Toutes les solutions")
     performance: Optional[BaselinePerformance] = None
     error: Optional[str] = None
