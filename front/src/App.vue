@@ -14,6 +14,15 @@ const trmPerformance = ref(null);
 const baselineResult = ref(null);
 const isBenchmarking = ref(false);
 const benchmarkStatus = ref("");
+const isImportModalOpen = ref(false);
+const importMatrixText = ref("");
+const importError = ref("");
+const showImportLegend = ref(false);
+const importPlaceholder = `Exemple :
+0 0 1 1
+0 2 2 1
+3 2 2 1
+3 3 3 1`;
 
 const isMobile = computed(() => windowWidth.value < 600);
 const currentSolutionIndex = ref(0);
@@ -55,6 +64,105 @@ const availableColors = computed(() => {
         return colors.filter((_, index) => usedColorsInGrid.has(index));
     }
 });
+
+const importLegendItems = computed(() => {
+    const items = Array.from({ length: colors.length }, (_, value) => ({
+        value,
+        color: colors[value],
+        label: `${value} = zone/couleur ${value + 1}`,
+        isEmpty: false,
+    }));
+    items.push({
+        value: -1,
+        color: "#fff",
+        label: "-1 = cellule vide",
+        isEmpty: true,
+    });
+    return items;
+});
+
+const importMatrixParseResult = computed(() => {
+    const lines = importMatrixText.value
+        .split(/\r?\n/)
+        .map((row) => row.trim())
+        .filter((row) => row.length > 0);
+
+    const previewRows = lines.map((line, rowIndex) => {
+        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
+        return tokens.map((token) => {
+            const isInteger = /^-?\d+$/.test(token);
+            const value = isInteger ? Number(token) : null;
+            const valid = isInteger && value >= -1;
+            return {
+                raw: token,
+                value,
+                valid,
+                rowIndex,
+            };
+        });
+    });
+
+    const maxColumns = previewRows.reduce(
+        (max, row) => Math.max(max, row.length),
+        0
+    );
+    previewRows.forEach((row) => {
+        while (row.length < maxColumns) {
+            row.push({
+                raw: "-1",
+                value: -1,
+                valid: true,
+                rowIndex: row.rowIndex,
+            });
+        }
+    });
+
+    let error = null;
+    if (lines.length === 0) {
+        error = null;
+    } else if (previewRows.some((row) => row.length === 0)) {
+        error = "La matrice contient une ligne vide.";
+    } else {
+        const size = previewRows.length;
+        const widths = previewRows.map((row) => row.length);
+        const rowCount = previewRows.length;
+        const colCount = widths[0] || 0;
+
+        if (!widths.every((width) => width === colCount)) {
+            error = "La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.";
+        } else if (rowCount !== colCount) {
+            error = "La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.";
+        } else if (rowCount < 4) {
+            error = "La matrice doit être d'au moins 4×4.";
+        } else {
+            const parsedValues = previewRows.flatMap((row) =>
+                row.filter((cell) => cell.valid).map((cell) => cell.value)
+            );
+            const uniqueValues = [...new Set(parsedValues.filter((v) => v !== -1))];
+            if (uniqueValues.length > rowCount) {
+                error = "La matrice contient plus de zones distinctes que la taille de la grille.";
+            } else if (uniqueValues.some((v) => v >= colors.length)) {
+                error = `Les identifiants de zone doivent être inférieurs à ${colors.length}.`;
+            } else if (previewRows.some((row) => row.some((cell) => !cell.valid))) {
+                error = "La matrice contient des valeurs invalides. Utilisez uniquement des entiers >= -1.";
+            }
+        }
+    }
+
+    return {
+        previewRows,
+        isValid: error === null && previewRows.length > 0 && previewRows.every((row) => row.length > 0),
+        error,
+    };
+});
+
+const importPreviewMatrix = computed(() => importMatrixParseResult.value.previewRows);
+const importIsValid = computed(
+    () => importMatrixText.value.trim().length > 0 && importMatrixParseResult.value.isValid
+);
+const importParseError = computed(
+    () => (importMatrixText.value.trim().length > 0 ? importMatrixParseResult.value.error : null)
+);
 
 const initializeZones = () => {
     zones.value = Array.from({ length: size.value }, () =>
@@ -108,6 +216,124 @@ const formatTime = (seconds) => {
     if (seconds < 0.001) return `${(seconds * 1_000_000).toFixed(0)} µs`;
     if (seconds < 1) return `${(seconds * 1000).toFixed(3)} ms`;
     return `${seconds.toFixed(3)} s`;
+};
+
+const openImportModal = () => {
+    isImportModalOpen.value = true;
+    importMatrixText.value = "";
+    importError.value = "";
+    showImportLegend.value = false;
+};
+
+const closeImportModal = () => {
+    isImportModalOpen.value = false;
+    importError.value = "";
+    showImportLegend.value = false;
+};
+
+const toggleImportLegend = () => {
+    showImportLegend.value = !showImportLegend.value;
+};
+
+const parseMatrixTextInput = (text) => {
+    const lines = text
+        .split(/\r?\n/)
+        .map((row) => row.trim())
+        .filter((row) => row.length > 0);
+
+    if (lines.length === 0) {
+        throw new Error("La matrice est vide.");
+    }
+
+    const matrix = lines.map((line, rowIndex) => {
+        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
+        if (tokens.length === 0) {
+            throw new Error(`La ligne ${rowIndex + 1} est vide.`);
+        }
+
+        return tokens.map((token) => {
+            if (!/^[-]?\d+$/.test(token)) {
+                throw new Error(`Valeur invalide : '${token}'. Utilisez uniquement des entiers.`);
+            }
+            const value = Number(token);
+            if (value < -1) {
+                throw new Error(`Les valeurs doivent être supérieures ou égales à -1. Valeur trouvée : ${value}.`);
+            }
+            return value;
+        });
+    });
+
+    const size = matrix.length;
+    if (!matrix.every((row) => row.length === size)) {
+        throw new Error("La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.");
+    }
+    if (size < 4) {
+        throw new Error("La matrice doit être d'au moins 4×4.");
+    }
+
+    const allValues = matrix.flat();
+    const uniqueValues = [...new Set(allValues.filter((v) => v !== -1))];
+    if (uniqueValues.length > size) {
+        throw new Error("La matrice contient plus de zones distinctes que la taille de la grille.");
+    }
+
+    const maxValue = uniqueValues.length > 0 ? Math.max(...uniqueValues) : -1;
+    if (maxValue >= colors.length) {
+        throw new Error(`Les identifiants de zone doivent être inférieurs à ${colors.length}.`);
+    }
+
+    const valueMap = new Map(uniqueValues.map((value, index) => [value, index]));
+    const normalized = matrix.map((row) =>
+        row.map((value) => (value === -1 ? -1 : valueMap.get(value)))
+    );
+
+    return normalized;
+};
+
+const parseMatrixTextInputPreview = (text) => {
+    const lines = text
+        .split(/\r?\n/)
+        .map((row) => row.trim())
+        .filter((row) => row.length > 0);
+
+    if (lines.length === 0) {
+        return null;
+    }
+
+    const matrix = lines.map((line) => {
+        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
+        return tokens.map((token) => {
+            if (!/^[-]?\d+$/.test(token)) {
+                return null;
+            }
+            const value = Number(token);
+            return value;
+        });
+    });
+
+    const maxCols = Math.max(...matrix.map((row) => row.length));
+    return matrix.map((row) => [
+        ...row,
+        ...Array(Math.max(0, maxCols - row.length)).fill(-1),
+    ]);
+};
+
+const applyImportedMatrix = () => {
+    try {
+        const matrix = parseMatrixTextInput(importMatrixText.value);
+        size.value = matrix.length;
+        zones.value = matrix;
+        positions.value = [];
+        solutions.value = [];
+        selectedHistoryIndex.value = -1;
+        trmPerformance.value = null;
+        baselineResult.value = null;
+        errorMessage.value = "";
+        selectedColor.value = 0;
+        isImportModalOpen.value = false;
+    } catch (err) {
+        importError.value = err instanceof Error ? err.message : "Format de matrice invalide.";
+    }
 };
 
 // speedup > 1 → TRM plus rapide, speedup < 1 → baseline plus rapide
@@ -691,10 +917,13 @@ initializeHistoryVisibility();
                             </template>
                             <template v-else-if="baselineResult?.performance">
                                 <span class="model-time">{{ formatTime(baselineResult.performance.execution_time) }}</span>
-                                <span class="model-badge" :class="baselineResult.performance.valid ? 'valid-badge' : 'invalid-badge'">
-                                    {{ baselineResult.performance.valid
-                                        ? `✓ ${baselineResult.performance.solutions_count} sol.`
-                                        : `✗ ${baselineResult.performance.conflicts} conflit(s)` }}
+                                <span
+                                    class="model-badge"
+                                    :class="baselineResult.performance.solutions_count === 0 ? 'neutral-badge' : 'valid-badge'"
+                                >
+                                    {{ baselineResult.performance.solutions_count === 0
+                                        ? `0 sol.`
+                                        : `✓ ${baselineResult.performance.solutions_count} sol.` }}
                                 </span>
                             </template>
                             <template v-else>
@@ -760,6 +989,105 @@ initializeHistoryVisibility();
                     <div v-if="benchmarkStatus" class="benchmark-status sidebar-status">
                         {{ benchmarkStatus }}
                     </div>
+                </div>
+                <button @click="openImportModal" class="import-btn">
+                    Importer une matrice
+                </button>
+            </div>
+        </div>
+
+        <div v-if="isImportModalOpen" class="modal-overlay" @click.self="closeImportModal">
+            <div class="modal-window">
+                <h3>Importer une matrice</h3>
+                <p>Collez une matrice carrée de taille minimale 4×4. Séparateurs supportés&nbsp;: espace, virgule ou point-virgule.</p>
+                <p class="modal-note">
+                    Une zone est définie par un même identifiant entier dans la matrice :
+                    <strong>0, 1, 2, ...</strong>. Le même nombre signifie la même zone/couleur.
+                    Utilisez <strong>-1</strong> pour une cellule vide.
+                </p>
+                <button
+                    class="legend-toggle-btn"
+                    type="button"
+                    @click="toggleImportLegend"
+                >
+                    {{ showImportLegend ? "Masquer la légende" : "Afficher la légende" }}
+                </button>
+                <div class="modal-import-content">
+                    <div class="import-textarea-panel">
+                        <textarea
+                            v-model="importMatrixText"
+                            class="matrix-textarea"
+                            :class="{ invalid: importParseError }"
+                            :placeholder="importPlaceholder"
+                        ></textarea>
+                        <div v-if="showImportLegend" class="modal-legend">
+                            <div class="legend-title">Légende de la matrice</div>
+                            <div
+                                v-for="item in importLegendItems"
+                                :key="item.value"
+                                class="legend-row"
+                            >
+                                <span
+                                    class="legend-color"
+                                    :class="{ 'empty-cell': item.isEmpty }"
+                                    :style="{
+                                        backgroundColor: item.isEmpty ? '#fff' : item.color,
+                                    }"
+                                ></span>
+                                <span>{{ item.label }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="import-preview">
+                        <div class="legend-title">Prévisualisation</div>
+                        <div v-if="importPreviewMatrix" class="import-preview-grid">
+                            <div
+                                v-for="(row, rowIndex) in importPreviewMatrix"
+                                :key="rowIndex"
+                                class="import-preview-row"
+                                :style="{ gridTemplateColumns: `repeat(${row.length}, minmax(18px, 1fr))` }"
+                            >
+                                <div
+                                    v-for="(cell, colIndex) in row"
+                                    :key="colIndex"
+                                    class="import-preview-cell"
+                                    :style="{
+                                        backgroundColor: !cell.valid
+                                            ? '#ffecec'
+                                            : cell.value === -1
+                                            ? '#fff'
+                                            : colors[cell.value],
+                                        color: !cell.valid
+                                            ? '#b71c1c'
+                                            : cell.value === -1
+                                            ? '#999'
+                                            : '#000',
+                                        borderColor: !cell.valid ? '#d32f2f' : cell.value === -1 ? '#ccc' : '#000'
+                                    }"
+                                >
+                                    {{ cell.raw === '' ? '-' : cell.raw }}
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="preview-empty">
+                            Entrez une matrice valide pour voir l’aperçu.
+                        </div>
+                    </div>
+                </div>
+                <div v-if="importError || importParseError" class="modal-error">
+                    {{ importError || importParseError }}
+                </div>
+                <div class="modal-actions">
+                    <button
+                        class="solve-btn"
+                        @click="applyImportedMatrix"
+                        :disabled="!importIsValid"
+                    >
+                        Valider
+                    </button>
+                    <button class="reset-btn" @click="closeImportModal">
+                        Annuler
+                    </button>
                 </div>
             </div>
         </div>
@@ -1044,7 +1372,7 @@ body {
     padding: 1vh 2vw;
     font-size: 1rem;
     cursor: pointer;
-    background-color: #ff9800;
+    background-color: #d32f2f;
     color: white;
     border: none;
     border-radius: 8px;
@@ -1055,7 +1383,7 @@ body {
 }
 
 .reset-btn:hover {
-    background-color: #e68900;
+    background-color: #b71c1c;
 }
 
 .benchmark-btn {
@@ -1098,6 +1426,213 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+.import-btn {
+    width: 100%;
+    padding: 1vh 2vw;
+    margin-top: 1.5vh;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #795548;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+.import-btn:hover {
+    background-color: #5d4037;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 999;
+}
+
+.modal-window {
+    width: min(100%, 700px);
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+    padding: 1.5rem;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-window h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+}
+
+.modal-window p {
+    margin: 0 0 1rem 0;
+    color: #444;
+    line-height: 1.5;
+}
+
+.matrix-textarea {
+    width: 100%;
+    min-height: 180px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 1rem;
+    font-size: 0.95rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    resize: vertical;
+}
+
+.matrix-textarea.invalid {
+    border: 1px solid #d32f2f;
+    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.18);
+}
+
+.modal-error {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #f8bdbd;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.modal-actions {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.modal-actions button {
+    min-width: 130px;
+    margin-top: 0;
+    margin-left: 0;
+    flex: 1;
+}
+
+.modal-actions .solve-btn,
+.modal-actions .reset-btn {
+    width: auto;
+}
+
+.legend-toggle-btn {
+    background: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.85rem 1.25rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.legend-toggle-btn:hover {
+    background: #115293;
+}
+
+.modal-import-content {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.import-textarea-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.import-preview {
+    background: #f7f9ff;
+    border: 1px solid #d0d8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    min-width: 220px;
+    max-height: 400px;
+    overflow: auto;
+}
+
+.import-preview-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.import-preview-row {
+    display: grid;
+    gap: 0.15rem;
+    width: 100%;
+}
+
+.import-preview-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    min-height: 18px;
+    aspect-ratio: 1 / 1;
+    padding: 0.2rem;
+    font-size: 0.75rem;
+    border: 1px solid #000;
+    border-radius: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-empty {
+    color: #555;
+    font-size: 0.95rem;
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.modal-legend {
+    padding: 1rem;
+    background: #f4f7ff;
+    border: 1px solid #d5dcef;
+    border-radius: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.modal-legend .legend-title {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.modal-legend .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    background: white;
+    border: 1px solid #d0d8f0;
+    border-radius: 12px;
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.modal-legend .legend-color.empty-cell {
+    background: #ffffff;
+    border-color: #999;
 }
 
 .sidebar-status {
@@ -1164,6 +1699,7 @@ body {
 }
 
 .valid-badge     { background: #e8f5e9; color: #2e7d32; }
+.neutral-badge   { background: #e8f0ff; color: #1e3a8a; }
 .invalid-badge   { background: #ffebee; color: #c62828; }
 .unsupported-badge { background: #fff3e0; color: #e65100; }
 
@@ -1223,6 +1759,76 @@ body {
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
     max-height: none;
     overflow-y: auto;
+}
+
+.legend-panel {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid #dfe3e8;
+    border-radius: 12px;
+}
+
+.legend-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: #333;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #444;
+}
+
+.legend-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #bbb;
+    display: inline-block;
+}
+
+.legend-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.8rem 1rem;
+    margin-bottom: 1rem;
+    background: #f0f4ff;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    text-align: center;
+}
+
+.legend-toggle-btn:hover {
+    background: #e3f2fd;
+}
+
+.modal-legend {
+    margin-bottom: 1rem;
+    padding: 0.8rem 1rem;
+    background: #f3f6ff;
+    border-radius: 10px;
+    border: 1px solid #d0d8f0;
+}
+
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    color: #333;
 }
 
 .color-btn {
