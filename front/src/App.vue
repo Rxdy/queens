@@ -12,6 +12,8 @@ const history = ref([]);
 const historyVisible = ref(true);
 const trmPerformance = ref(null);
 const baselineResult = ref(null);
+const isBenchmarking = ref(false);
+const benchmarkStatus = ref("");
 
 const isMobile = computed(() => windowWidth.value < 600);
 const currentSolutionIndex = ref(0);
@@ -103,11 +105,14 @@ const formatTime = (seconds) => {
     return `${seconds.toFixed(3)} s`;
 };
 
+// speedup > 1 → TRM plus rapide, speedup < 1 → baseline plus rapide
+// Affiché comme "TRM est X× plus rapide" ou "Baseline est X× plus rapide"
 const speedup = computed(() => {
     const trmTime = trmPerformance.value?.execution_time;
     const baseTime = baselineResult.value?.performance?.execution_time;
     if (!trmTime || !baseTime || !baselineResult.value?.supported) return null;
-    return (trmTime / baseTime).toFixed(1);
+    // ratio = baseTime / trmTime : >1 signifie TRM plus rapide
+    return (baseTime / trmTime).toFixed(1);
 });
 
 const submit = async () => {
@@ -182,18 +187,24 @@ const submit = async () => {
 
 // Vérifier si la grille est complètement remplie et utilise le bon nombre de couleurs
 const isGridComplete = computed(() => {
-    if (!zones.value) return false;
-
-    const allCellsFilled = zones.value.flat().every((cell) => cell !== -1);
-    const usedColorsCount = new Set(
-        zones.value.flat().filter((cell) => cell !== -1)
-    ).size;
-    const requiredColors = size.value;
-
-    return allCellsFilled && usedColorsCount === requiredColors;
+    // Pour le problème des reines, la grille est toujours prête à être résolue
+    // L'utilisateur peut peindre des obstacles, mais ce n'est pas obligatoire
+    return zones.value && zones.value.length > 0;
 });
 
 const getCellStyle = (row, col) => {
+    // Garde contre les grilles non initialisées
+    if (!zones.value || !zones.value[row] || zones.value[row][col] === undefined) {
+        return {
+            backgroundColor: "white",
+            borderTop: "1px solid #000",
+            borderLeft: "1px solid #000",
+            borderBottom: "1px solid #000",
+            borderRight: "1px solid #000",
+            boxSizing: "border-box",
+        };
+    }
+
     const currentColor = zones.value[row][col];
 
     if (currentColor === -1) {
@@ -279,6 +290,190 @@ const loadFromHistory = (entry, index) => {
     errorMessage.value = "";
     selectedHistoryIndex.value = index;
     isPainting.value = false; // Réinitialiser l'état de painting
+    
+    // Charger les times de comparaison s'ils existent (du benchmark)
+    if (entry.trmTime !== undefined) {
+        trmPerformance.value = {
+            execution_time: entry.trmTime,
+            solutions_count: solutions.value.length,
+        };
+    } else {
+        trmPerformance.value = null;
+    }
+    
+    if (entry.baselineTime !== undefined) {
+        baselineResult.value = {
+            supported: true,
+            performance: {
+                execution_time: entry.baselineTime,
+                valid: entry.baselineValid,
+                conflicts: entry.baselineValid ? 0 : 1,
+                solutions_count: entry.baselineSolutionsCount ?? 0,
+            },
+        };
+    } else {
+        baselineResult.value = null;
+    }
+};
+
+// Génère N zones connexes aléatoires couvrant toutes les cellules (règle du jeu).
+// Algorithme : croissance régionale depuis N graines aléatoires (flood-fill)
+// → garantit que chaque zone est d'un seul tenant.
+const generateRandomConnectedPattern = (size) => {
+    const zones = Array.from({ length: size }, () => Array(size).fill(-1));
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+    const shuffle = arr => {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    };
+
+    // Étape 1 : placer N graines en essayant de les espacer
+    const seeds = [];
+    const minSep = Math.max(1, Math.floor(size / Math.sqrt(size)));
+    for (let color = 0; color < size; color++) {
+        let placed = false;
+        for (let attempt = 0; attempt < 400 && !placed; attempt++) {
+            const r = Math.floor(Math.random() * size);
+            const c = Math.floor(Math.random() * size);
+            if (zones[r][c] !== -1) continue;
+            const tooClose = seeds.some(([sr, sc]) => Math.abs(r - sr) + Math.abs(c - sc) < minSep);
+            if (!tooClose) {
+                zones[r][c] = color;
+                seeds.push([r, c]);
+                placed = true;
+            }
+        }
+        // Fallback : n'importe quelle cellule libre
+        if (!placed) {
+            outer: for (let r = 0; r < size; r++)
+                for (let c = 0; c < size; c++)
+                    if (zones[r][c] === -1) { zones[r][c] = color; seeds.push([r, c]); placed = true; break outer; }
+        }
+    }
+
+    // Étape 2 : croissance simultanée des régions (BFS aléatoire)
+    // frontiers[i] = cellules de la couleur i encore capables de s'étendre
+    const frontiers = seeds.map(([r, c]) => [[r, c]]);
+    let remaining = size * size - size;
+    let guard = size * size * 10;
+
+    while (remaining > 0 && guard-- > 0) {
+        // Ordre des couleurs aléatoire à chaque tour
+        const colorOrder = shuffle(Array.from({ length: size }, (_, i) => i));
+        for (const color of colorOrder) {
+            if (remaining <= 0) break;
+            const frontier = frontiers[color];
+            if (frontier.length === 0) continue;
+            // Cellule aléatoire du front
+            const fi = Math.floor(Math.random() * frontier.length);
+            const [r, c] = frontier[fi];
+            // Direction aléatoire vers une cellule libre
+            const sdirs = shuffle([...dirs]);
+            let expanded = false;
+            for (const [dr, dc] of sdirs) {
+                const nr = r + dr, nc = c + dc;
+                if (nr >= 0 && nr < size && nc >= 0 && nc < size && zones[nr][nc] === -1) {
+                    zones[nr][nc] = color;
+                    frontier.push([nr, nc]);
+                    remaining--;
+                    expanded = true;
+                    break;
+                }
+            }
+            if (!expanded) frontier.splice(fi, 1);
+        }
+    }
+
+    // Sécurité : remplir les cellules orphelines avec la couleur voisine la plus proche
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (zones[r][c] !== -1) continue;
+            let best = 0, bestDist = Infinity;
+            for (let rr = 0; rr < size; rr++)
+                for (let cc = 0; cc < size; cc++)
+                    if (zones[rr][cc] !== -1) {
+                        const d = Math.abs(r - rr) + Math.abs(c - cc);
+                        if (d < bestDist) { bestDist = d; best = zones[rr][cc]; }
+                    }
+            zones[r][c] = best;
+        }
+    }
+
+    // Vérification finale : toutes les N couleurs présentes
+    const usedColors = new Set(zones.flat());
+    if (usedColors.size !== size) {
+        // Fallback ultime : bandes horizontales
+        for (let r = 0; r < size; r++)
+            for (let c = 0; c < size; c++)
+                zones[r][c] = r;
+    }
+
+    return zones;
+};
+
+const benchmarkAllSizes = async () => {
+    isBenchmarking.value = true;
+    benchmarkStatus.value = "Lancement du benchmark...";
+    const benchmarkSizes = [4, 5, 6, 7, 8, 9, 10, 11, 12];
+    let successCount = 0;
+    
+    for (let idx = 0; idx < benchmarkSizes.length; idx++) {
+        const testSize = benchmarkSizes[idx];
+        if (!isBenchmarking.value) break;
+
+        const patternName = "Zones aléatoires";
+        benchmarkStatus.value = `Test ${testSize}×${testSize} — ${patternName} (${idx + 1}/${benchmarkSizes.length})`;
+        
+        const testZones = generateRandomConnectedPattern(testSize);
+        
+        const payload = {
+            size: testSize,
+            zones: testZones,
+        };
+        
+        // Lancer les deux modèles en parallèle
+        const [trmRes, baselineRes] = await Promise.allSettled([
+            axios.post("http://localhost:8000/api/solve", payload),
+            axios.post("http://localhost:8001/api/solve", payload),
+        ]);
+        
+        // Extraire les solutions du TRM
+        let resultSolutions = [];
+        let trm_solutions_count = 0;
+        if (trmRes.status === "fulfilled") {
+            resultSolutions = trmRes.value.data.solutions;
+            trm_solutions_count = trmRes.value.data.performance.solutions_count;
+            successCount++;
+        }
+        
+        // Ajouter à l'historique (même si 0 solutions, pour montrer les temps)
+        if (trmRes.status === "fulfilled") {
+            history.value.unshift({
+                grid: testZones.map((row) => [...row]),
+                solutions: resultSolutions.map((sol) => [...sol]),
+                timestamp: new Date().toLocaleString("fr-FR"),
+                size: testSize,
+                patternName,
+                trmTime: trmRes.value.data.performance.execution_time,
+                trmSolutionsCount: trm_solutions_count,
+                baselineTime: baselineRes.status === "fulfilled" ? baselineRes.value.data.performance.execution_time : null,
+                baselineValid: baselineRes.status === "fulfilled" ? baselineRes.value.data.performance.valid : false,
+                baselineSolutionsCount: baselineRes.status === "fulfilled" ? baselineRes.value.data.performance.solutions_count : 0,
+            });
+        }
+        
+        // Petit délai pour éviter de surcharger les serveurs
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    benchmarkStatus.value = `Benchmark terminé! ${successCount}/${benchmarkSizes.length} tests réussis`;
+    isBenchmarking.value = false;
+    setTimeout(() => {
+        benchmarkStatus.value = "";
+    }, 3000);
 };
 
 const toggleHistory = () => {
@@ -383,10 +578,15 @@ initializeHistoryVisibility();
                                 entry.timestamp
                             }}</span>
                         </div>
+                        <div v-if="entry.patternName" class="history-entry-pattern">
+                            {{ entry.patternName }}
+                        </div>
                         <div class="history-entry-solutions">
-                            {{ entry.solutions.length }} solution{{
-                                entry.solutions.length > 1 ? "s" : ""
-                            }}
+                            {{ entry.solutions.length > 0 ? `${entry.solutions.length} solution${entry.solutions.length > 1 ? "s" : ""}` : "Aucune solution" }}
+                        </div>
+                        <div v-if="entry.trmTime !== undefined" class="history-entry-times">
+                            <span class="entry-time-trm" title="TRM">TRM: {{ formatTime(entry.trmTime) }}</span>
+                            <span v-if="entry.baselineTime !== null" class="entry-time-baseline" title="Baseline">Baseline: {{ formatTime(entry.baselineTime) }}</span>
                         </div>
                     </div>
                 </div>
@@ -472,14 +672,14 @@ initializeHistoryVisibility();
                     <h4 class="comparison-title">⚡ Comparaison des modèles</h4>
                     <div class="comparison-rows">
                         <div class="comparison-row">
-                            <span class="model-label trm-label">TRM (récursif)</span>
+                            <span class="model-label trm-label">TRM (récursif optimisé)</span>
                             <span class="model-time">{{ formatTime(trmPerformance?.execution_time) }}</span>
                             <span class="model-badge valid-badge">
                                 ✓ {{ trmPerformance?.solutions_count ?? 0 }} sol.
                             </span>
                         </div>
                         <div class="comparison-row">
-                            <span class="model-label baseline-label">Baseline (MLP)</span>
+                            <span class="model-label baseline-label">Baseline (backtracking naïvement)</span>
                             <template v-if="baselineResult?.supported === false">
                                 <span class="model-time muted">N/A</span>
                                 <span class="model-badge unsupported-badge">❌ Erreur</span>
@@ -487,7 +687,9 @@ initializeHistoryVisibility();
                             <template v-else-if="baselineResult?.performance">
                                 <span class="model-time">{{ formatTime(baselineResult.performance.execution_time) }}</span>
                                 <span class="model-badge" :class="baselineResult.performance.valid ? 'valid-badge' : 'invalid-badge'">
-                                    {{ baselineResult.performance.valid ? '✓ Valide' : `✗ ${baselineResult.performance.conflicts} conflit(s)` }}
+                                    {{ baselineResult.performance.valid
+                                        ? `✓ ${baselineResult.performance.solutions_count} sol.`
+                                        : `✗ ${baselineResult.performance.conflicts} conflit(s)` }}
                                 </span>
                             </template>
                             <template v-else>
@@ -497,10 +699,10 @@ initializeHistoryVisibility();
                     </div>
                     <div v-if="speedup !== null" class="speedup-info">
                         <template v-if="Number(speedup) >= 1">
-                            Le baseline est <strong>{{ speedup }}×</strong> plus rapide que TRM
+                            TRM est <strong>{{ speedup }}×</strong> plus rapide que le baseline
                         </template>
                         <template v-else>
-                            TRM est <strong>{{ (1 / Number(speedup)).toFixed(1) }}×</strong> plus rapide que le baseline
+                            Le baseline est <strong>{{ (1 / Number(speedup)).toFixed(1) }}×</strong> plus rapide que TRM
                         </template>
                     </div>
                 </div>
@@ -515,6 +717,16 @@ initializeHistoryVisibility();
                 <button @click="resetGrid" class="reset-btn">
                     Réinitialiser la grille
                 </button>
+                <button
+                    @click="benchmarkAllSizes"
+                    class="benchmark-btn"
+                    :disabled="isBenchmarking"
+                >
+                    {{ isBenchmarking ? "Benchmark en cours..." : "Benchmark (4-12)" }}
+                </button>
+                <div v-if="benchmarkStatus" class="benchmark-status">
+                    {{ benchmarkStatus }}
+                </div>
                 <div v-if="errorMessage" class="error-message">
                     {{ errorMessage }}
                 </div>
@@ -821,6 +1033,59 @@ body {
     max-width: 80vw;
 }
 
+.reset-btn {
+    padding: 1vh 2vw;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+    margin-top: 1vh;
+    margin-left: 1vw;
+    font-weight: bold;
+}
+
+.reset-btn:hover {
+    background-color: #e68900;
+}
+
+.benchmark-btn {
+    padding: 1vh 2vw;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+    margin-top: 1vh;
+    margin-left: 1vw;
+    font-weight: bold;
+}
+
+.benchmark-btn:hover:not(:disabled) {
+    background-color: #0b7dda;
+}
+
+.benchmark-btn:disabled {
+    background-color: #90caf9;
+    cursor: not-allowed;
+}
+
+.benchmark-status {
+    margin-top: 1vh;
+    padding: 0.8vh 1.5vw;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    text-align: center;
+    font-weight: 500;
+}
+
 /* --- Panneau de comparaison des modèles --- */
 .comparison-panel {
     margin-top: 1.2vh;
@@ -1059,6 +1324,31 @@ body {
 .history-entry-solutions {
     color: #6b7280;
     font-size: 13px;
+}
+
+.history-entry-pattern {
+    font-size: 11px;
+    color: #9ca3af;
+    font-style: italic;
+    margin-top: 1px;
+}
+
+.history-entry-times {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+}
+
+.entry-time-trm {
+    font-size: 11px;
+    color: #10b981;
+    font-weight: 600;
+}
+
+.entry-time-baseline {
+    font-size: 11px;
+    color: #f59e0b;
+    font-weight: 600;
 }
 
 .solutions-info {
