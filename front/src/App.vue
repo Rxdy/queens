@@ -32,6 +32,18 @@ const selectedHistoryIndex = ref(-1);
 // Dimensions de l'écran réactives
 const screenWidth = ref(1200);
 const screenHeight = ref(800);
+
+// Debug: mesurer les vraies dimensions des cellules
+const gridDebugInfo = ref({
+    calculatedCellSize: 0,
+    actualCellSize: 0,
+    gridWidth: 0,
+    gridHeight: 0,
+    totalWidth: 0,
+    totalHeight: 0,
+    message: "",
+});
+
 const colors = [
     "rgb(223, 160, 191)",
     "rgb(150, 190, 255)",
@@ -747,6 +759,40 @@ const updateScreenSize = () => {
     }
 };
 
+// Fonction pour mesurer les vraies dimensions des cellules du DOM
+const measureGridCells = () => {
+    setTimeout(() => {
+        const gridEl = document.querySelector(".grid");
+        if (!gridEl) return;
+        
+        const gridRect = gridEl.getBoundingClientRect();
+        const firstCell = gridEl.querySelector(".cell");
+        
+        if (firstCell) {
+            const cellRect = firstCell.getBoundingClientRect();
+            const actualCellSize = cellRect.width;
+            const diff = cellSize.value - actualCellSize;
+            
+            gridDebugInfo.value = {
+                calculatedCellSize: cellSize.value,
+                actualCellSize: Math.round(actualCellSize * 100) / 100,
+                gridWidth: Math.round(gridRect.width),
+                gridHeight: Math.round(gridRect.height),
+                totalWidth: Math.round(gridRect.width),
+                totalHeight: Math.round(gridRect.height),
+                message: diff > 2 ? "WARNING: cells smaller than calculated!" : "OK",
+            };
+            
+            console.log("Grid Debug:", gridDebugInfo.value);
+        }
+    }, 10);
+};
+
+// Watcher pour mesurer les cellules quand la taille change
+watch(() => [size.value, cellSize.value], () => {
+    measureGridCells();
+});
+
 // Lifecycle hooks pour gérer les event listeners
 onMounted(() => {
     updateScreenSize();
@@ -754,6 +800,8 @@ onMounted(() => {
     // Ajouter un listener global pour mouseup pour éviter que isPainting reste bloqué
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("mouseleave", onMouseUp);
+    // Mesurer les cellules au montage
+    measureGridCells();
 });
 
 onUnmounted(() => {
@@ -833,12 +881,17 @@ initializeHistoryVisibility();
                         l'historique
                     </button>
                 </div>
+                <div class="debug-info">
+                    <small>
+                        Cell: {{ gridDebugInfo.calculatedCellSize }}px (calc) → {{ gridDebugInfo.actualCellSize }}px (real) | Grid: {{ gridDebugInfo.totalWidth }}×{{ gridDebugInfo.totalHeight }}px | {{ gridDebugInfo.message }}
+                    </small>
+                </div>
                 <div
                     class="grid"
                     :style="{
                         gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
-                        width: `${cellSize * size}px`,
-                        height: `${cellSize * size}px`,
+                        width: `${cellSize * size + 10}px`,
+                        height: `${cellSize * size + 10}px`,
                     }"
                     @mouseup="onMouseUp"
                 >
@@ -1293,6 +1346,16 @@ body {
 
 .toggle-history-btn:hover {
     background-color: #5a6268;
+}
+
+.debug-info {
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #333;
 }
 
 .grid {
