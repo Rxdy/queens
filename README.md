@@ -6,16 +6,17 @@ Vous pouvez dessiner votre plateau, importer une image de grille de zones color�
 
 ## 🎮 À propos du jeu des Reines
 
-Le problème des N-Reines consiste à placer **N reines** sur un échiquier de taille **N×N** de manière à ce que :
-- Aucune deux reines ne soient sur la même **ligne**
-- Aucune deux reines ne soient sur la même **colonne**  
-- Aucune deux reines ne soient sur la même **diagonale**
+Dans cette application, le plateau est divisé en **zones colorées**. Le but est de placer **une reine par zone** de sorte que :
+- Aucune reine ne soit sur la même **ligne** qu'une autre
+- Aucune reine ne soit sur la même **colonne** qu'une autre
+- Aucune reine ne soit sur la même **diagonale** qu'une autre
+- Aucune reine ne soit sur une **case adjacente** à une autre reine
 
-### Variante avec zones colorées
+### Variante basée sur les zones
 
-Dans cette application, l'échiquier est divisé en **zones colorées** pour ajouter une couche de complexité :
-- Chaque zone représente une région contrainte
-- Vous devez placer les reines en respect des zones ET des règles classiques
+Chaque zone correspond à une région du plateau et doit contenir exactement **une reine**. Les zones introduisent une structure supplémentaire :
+- il faut respecter une reine par zone
+- il faut respecter les contraintes de ligne, colonne, diagonale et adjacency
 
 ## 🤖 Deux algorithmes en compétition
 
@@ -69,9 +70,18 @@ Les services démarrent automatiquement. Les dépendances sont installées dans 
 
 ### 3️⃣ Accéder à l'application
 
-- **Interface Web** : http://localhost:5173
+- **Page d'accueil** : http://localhost:5173
+  - Statut : service **Frontend**
+  - Description : page d’accueil élégante qui présente le projet et guide vers l’application
+- **Application Vue** : http://localhost:5173/app.html
+  - Statut : service **Frontend**
+  - Description : interface principale pour dessiner la grille, importer une image et lancer les résolutions
 - **API TRM** : http://localhost:8000
+  - Statut : service **Solveur TRM**
+  - Description : endpoint principal du modèle moderne, utilisé pour résoudre la grille et comparer les performances
 - **API Baseline** : http://localhost:8001
+  - Statut : service **Solveur Baseline**
+  - Description : endpoint de comparaison heuristique, pour mesurer les performances du solveur de référence
 
 ### ✅ Vérifier l'état des services
 
@@ -79,6 +89,7 @@ Les services démarrent automatiquement. Les dépendances sont installées dans 
 make services
 ```
 
+> Si vous suivez les étapes du README avec Docker et Docker Compose, le lancement du projet doit fonctionner sans problème sur une machine propre.
 Affiche l'état de chaque service avec son URL et son statut.
 
 ---
@@ -167,16 +178,6 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8001 --reload
 ```
 
----
-
-## 🧪 Tests
-
-Tests d'extraction d'images synthétiques :
-
-```bash
-# Dans le container ou localement avec Python 3.12+
-python generate_test_images.py
-```
 
 Génère 6 images de test avec validation d'extraction (5x5 à 8x8).
 
