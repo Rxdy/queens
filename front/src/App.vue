@@ -717,16 +717,6 @@ initializeHistoryVisibility();
                 <button @click="resetGrid" class="reset-btn">
                     Réinitialiser la grille
                 </button>
-                <button
-                    @click="benchmarkAllSizes"
-                    class="benchmark-btn"
-                    :disabled="isBenchmarking"
-                >
-                    {{ isBenchmarking ? "Benchmark en cours..." : "Benchmark (4-12)" }}
-                </button>
-                <div v-if="benchmarkStatus" class="benchmark-status">
-                    {{ benchmarkStatus }}
-                </div>
                 <div v-if="errorMessage" class="error-message">
                     {{ errorMessage }}
                 </div>
@@ -753,6 +743,18 @@ initializeHistoryVisibility();
                         :style="{ backgroundColor: color }"
                         @click="selectedColor = index"
                     ></div>
+                </div>
+                <div class="benchmark-panel">
+                    <button
+                        @click="benchmarkAllSizes"
+                        class="benchmark-btn"
+                        :disabled="isBenchmarking"
+                    >
+                        {{ isBenchmarking ? "Benchmark en cours..." : "Benchmark (4-12)" }}
+                    </button>
+                    <div v-if="benchmarkStatus" class="benchmark-status sidebar-status">
+                        {{ benchmarkStatus }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1061,8 +1063,8 @@ body {
     border-radius: 8px;
     transition: background-color 0.3s;
     margin-top: 1vh;
-    margin-left: 1vw;
     font-weight: bold;
+    width: 100%;
 }
 
 .benchmark-btn:hover:not(:disabled) {
@@ -1084,6 +1086,17 @@ body {
     font-size: 0.85rem;
     text-align: center;
     font-weight: 500;
+}
+
+.benchmark-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sidebar-status {
+    width: 100%;
 }
 
 /* --- Panneau de comparaison des modèles --- */
