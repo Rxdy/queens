@@ -36,7 +36,7 @@ async def solve(grid: GridInput):
             performance=BaselinePerformance(
                 execution_time=elapsed,
                 valid=valid,
-                conflicts=0 if valid else 1,
+                conflicts=0,
                 solutions_count=count,
             ),
         )

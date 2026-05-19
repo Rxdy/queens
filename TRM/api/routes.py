@@ -1,19 +1,21 @@
 """
 Routes API pour TRM Solver
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 import logging
 import time
 
-from api.models import GridInput, Solution, PerformanceMetrics
+from api.models import GridInput, Solution, PerformanceMetrics, ExtractedMatrix
 from core.solver import QueensSolver
 from core.config import MAX_ITERATIONS
+from utils.image_processor import extract_matrix_from_image
 
 logger = logging.getLogger("trm_solver")
 router = APIRouter()
 
 # Instance du solveur
 solver = QueensSolver(max_iterations=MAX_ITERATIONS)
+
 
 
 @router.post("/solve", response_model=Solution)
@@ -78,6 +80,52 @@ async def solve(grid: GridInput):
         raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 
+@router.post("/extract-matrix", response_model=ExtractedMatrix)
+async def extract_matrix(file: UploadFile = File(...)):
+    """
+    Extrait une matrice de zones d'une image de grille.
+    
+    Args:
+        file: Fichier image (PNG, JPG, etc.)
+    
+    Returns:
+        Matrice extraite avec taille et score de confiance
+    """
+    try:
+        # Vérifier le type de fichier
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "image/gif"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Type de fichier non supporté: {file.content_type}. Utilisez PNG, JPG ou GIF."
+            )
+        
+        # Lire le contenu du fichier
+        image_data = await file.read()
+        
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Fichier image vide")
+        
+        logger.info(f"🖼️  Traitement d'image: {file.filename} ({len(image_data)} bytes)")
+        
+        # Extraire la matrice
+        result = extract_matrix_from_image(image_data)
+        
+        logger.info(f"✅ Matrice extraite: {result['size']}x{result['size']}")
+        logger.info(f"📊 Confiance: {result['confidence']:.2%}")
+        
+        return ExtractedMatrix(
+            size=result["size"],
+            zones=result["zones"],
+            confidence=result["confidence"]
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de l'extraction: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement de l'image: {str(e)}")
+
+
 @router.get("/health")
 async def health():
     """Point de santé de l'API"""
@@ -86,3 +134,4 @@ async def health():
         "service": "TRM Solver",
         "max_iterations": MAX_ITERATIONS
     }
+

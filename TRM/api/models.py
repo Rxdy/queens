@@ -54,3 +54,29 @@ class Solution(BaseModel):
                 }
             }
         }
+
+
+class ExtractedMatrix(BaseModel):
+    """Modèle pour la réponse d'extraction de matrice d'image"""
+    size: int = Field(..., description="Taille de la grille détectée")
+    zones: List[List[int]] = Field(..., description="Matrice de zones extraite")
+    confidence: float = Field(..., description="Score de confiance de l'extraction (0-1)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "size": 8,
+                "zones": [
+                    [0, 0, 1, 1, 2, 2, 3, 3],
+                    [0, 4, 4, 1, 2, 5, 5, 3],
+                    [6, 4, 7, 1, 2, 5, 8, 3],
+                    [6, 6, 7, 7, 2, 2, 8, 8],
+                    [9, 9, -1, -1, 10, 10, 11, 11],
+                    [9, -1, -1, -1, 10, -1, 11, 11],
+                    [12, -1, -1, -1, 10, -1, -1, 11],
+                    [12, 12, 12, 12, 10, 10, 10, 10]
+                ],
+                "confidence": 0.85
+            }
+        }
+

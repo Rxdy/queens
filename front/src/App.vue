@@ -872,6 +872,27 @@ initializeHistoryVisibility();
             </div>
             <div class="grid-container">
                 <div class="grid-header">
+                    <div class="grid-toolbar">
+                        <button
+                            @click="submit"
+                            :disabled="!isGridComplete"
+                            class="icon-btn solve-icon-btn"
+                            title="Résoudre"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 16.2l-3.5-3.5L4 14.2l5 5 12-12-1.4-1.4z" />
+                            </svg>
+                        </button>
+                        <button
+                            @click="resetGrid"
+                            class="icon-btn reset-icon-btn"
+                            title="Réinitialiser la grille"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 5V2L8 6l4 4V7c3.3 0 6 2.7 6 6 0 1.1-.3 2.2-.9 3.1l1.5 1.5C19.7 15.6 20 13.8 20 12c0-4.4-3.6-8-8-8zm-6.1 2.9L4.4 6.4C3.6 7.9 3 9.9 3 12c0 4.4 3.6 8 8 8v3l4-4-4-4v3c-3.3 0-6-2.7-6-6 0-1.1.3-2.2.9-3.1z" />
+                            </svg>
+                        </button>
+                    </div>
                     <button
                         v-if="windowWidth < 600"
                         @click="toggleHistory"
@@ -994,16 +1015,6 @@ initializeHistoryVisibility();
                     </div>
                 </div>
 
-                <button
-                    @click="submit"
-                    class="solve-btn"
-                    :disabled="!isGridComplete"
-                >
-                    Résoudre
-                </button>
-                <button @click="resetGrid" class="reset-btn">
-                    Réinitialiser la grille
-                </button>
                 <div v-if="errorMessage" class="error-message">
                     {{ errorMessage }}
                 </div>
@@ -1346,6 +1357,62 @@ body {
 
 .toggle-history-btn:hover {
     background-color: #5a6268;
+}
+
+.grid-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 10px;
+}
+
+.grid-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.icon-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background-color: #f4f4f4;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.icon-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+.solve-icon-btn {
+    color: #1976d2;
+    border-color: rgba(25, 118, 210, 0.2);
+}
+
+.reset-icon-btn {
+    color: #d32f2f;
+    border-color: rgba(211, 47, 47, 0.2);
 }
 
 .debug-info {
