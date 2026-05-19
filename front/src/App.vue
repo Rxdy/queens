@@ -770,23 +770,23 @@ initializeHistoryVisibility();
 html,
 body {
     width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    overflow: auto;
 }
 </style>
 
 <style scoped>
 .app {
     width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 1vh 1vw;
     background-color: #f5f5f5;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .title {
