@@ -25,30 +25,16 @@ class QueensSolver:
     def is_safe(self, row: int, col: int, positions: List[List[int]]) -> bool:
         """
         Vérifie si une position est sûre pour placer une reine.
-        
-        Contraintes:
-        - Pas sur la même ligne (implicite par le backtracking)
-        - Pas sur la même colonne (vérifié par used_cols)
-        - Pas adjacente à une autre reine (distance <= 1)
-        
-        Args:
-            row: Ligne de la position à tester
-            col: Colonne de la position à tester
-            positions: Liste des positions déjà occupées par des reines
-        
-        Returns:
-            True si la position est sûre, False sinon
+
+        Optimisation clé : avec un placement ligne par ligne, seule la reine
+        de la ligne précédente (row-1) peut être adjacente au sens max(dr,dc)==1.
+        Pour toute reine à row-k (k>=2), dr=k>=2 donc max(dr,dc)>=2 → jamais adjacent.
+        → Vérification O(1) au lieu de O(row).
         """
-        for prev_row, prev_col in positions:
-            dr = abs(row - prev_row)
-            dc = abs(col - prev_col)
-            
-            # Contrainte d'adjacence: pas de reines dans les 8 cases adjacentes
-            # max(dr, dc) == 1 signifie adjacent (y compris diagonale adjacente)
-            if max(dr, dc) == 1:
-                return False
-        
-        return True
+        if not positions:
+            return True
+        _, prev_col = positions[-1]   # prev_row == row - 1 (toujours, car backtracking ligne/ligne)
+        return abs(col - prev_col) > 1
     
     def solve(self, size: int, zones: List[List[int]]) -> Tuple[List[List[List[int]]], int]:
         """
