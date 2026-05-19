@@ -1078,15 +1078,15 @@ initializeHistoryVisibility();
                     {{ importError || importParseError }}
                 </div>
                 <div class="modal-actions">
+                    <button class="reset-btn" @click="closeImportModal">
+                        Annuler
+                    </button>
                     <button
                         class="solve-btn"
                         @click="applyImportedMatrix"
                         :disabled="!importIsValid"
                     >
                         Valider
-                    </button>
-                    <button class="reset-btn" @click="closeImportModal">
-                        Annuler
                     </button>
                 </div>
             </div>
@@ -1305,6 +1305,7 @@ body {
     box-sizing: border-box;
     overflow: hidden;
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .cell {
