@@ -221,6 +221,7 @@ const initializeZones = () => {
 };
 
 const clickCell = (row, col) => {
+    if (isViewingHistory.value) return; // Empêcher les modifications en visualisant un historique
     if (zones.value[row][col] === selectedColor.value) {
         zones.value[row][col] = -1; // Remettre à vide
     } else {
@@ -269,6 +270,7 @@ const resetImportImageState = () => {
 };
 
 const openImportModal = () => {
+    if (isViewingHistory.value) return; // Empêcher d'ouvrir si on visualise un historique
     isImportModalOpen.value = true;
     importMode.value = "text";
     importMatrixText.value = "";
@@ -560,6 +562,8 @@ const hasGridData = computed(() => {
     );
 });
 
+const isViewingHistory = computed(() => selectedHistoryIndex.value !== -1);
+
 const getCellStyle = (row, col) => {
     // Garde contre les grilles non initialisées
     if (!zones.value || !zones.value[row] || zones.value[row][col] === undefined) {
@@ -682,6 +686,34 @@ const loadFromHistory = (entry, index) => {
     } else {
         baselineResult.value = null;
     }
+};
+
+const toggleHistorySelection = (entry, index) => {
+    if (selectedHistoryIndex.value === index) {
+        // Déselectionner et vider la grille
+        initializeZones();
+        selectedHistoryIndex.value = -1;
+        solutions.value = [];
+        positions.value = [];
+        errorMessage.value = "";
+        currentSolutionIndex.value = 0;
+        trmPerformance.value = null;
+        baselineResult.value = null;
+    } else {
+        // Charger l'historique
+        loadFromHistory(entry, index);
+    }
+};
+
+const clearForNewGrid = () => {
+    initializeZones();
+    selectedHistoryIndex.value = -1;
+    solutions.value = [];
+    positions.value = [];
+    errorMessage.value = "";
+    currentSolutionIndex.value = 0;
+    trmPerformance.value = null;
+    baselineResult.value = null;
 };
 
 // Génère N zones connexes aléatoires couvrant toutes les cellules (règle du jeu).
@@ -972,7 +1004,7 @@ initializeHistoryVisibility();
                         :key="index"
                         class="history-entry"
                         :class="{ selected: selectedHistoryIndex === index }"
-                        @click="loadFromHistory(entry, index)"
+                        @click="toggleHistorySelection(entry, index)"
                     >
                         <div class="history-entry-header">
                             <span class="history-entry-title"
@@ -999,8 +1031,15 @@ initializeHistoryVisibility();
                 <div class="grid-header">
                     <div class="grid-toolbar">
                         <button
+                            @click="clearForNewGrid"
+                            class="icon-btn new-icon-btn"
+                            title="Nouvelle grille"
+                        >
+                            <i class="ri-add-line" aria-hidden="true"></i>
+                        </button>
+                        <button
                             @click="submit"
-                            :disabled="!isGridComplete"
+                            :disabled="!isGridComplete || isViewingHistory"
                             class="icon-btn solve-icon-btn"
                             title="Résoudre"
                         >
@@ -1008,7 +1047,7 @@ initializeHistoryVisibility();
                         </button>
                         <button
                             @click="resetGrid"
-                            :disabled="!hasGridData"
+                            :disabled="!hasGridData || isViewingHistory"
                             class="icon-btn reset-icon-btn"
                             title="Réinitialiser la grille"
                         >
@@ -1025,6 +1064,7 @@ initializeHistoryVisibility();
                         <button
                             @click="openImportModal"
                             class="icon-btn import-icon-btn"
+                            :disabled="isViewingHistory"
                             title="Importer une image"
                         >
                             <i class="ri-upload-cloud-line" aria-hidden="true"></i>
@@ -1515,7 +1555,12 @@ body {
     width: 100%;
     padding: 0;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow: visible;
+}
+
+.grid-header {
+    position: relative;
+    z-index: 1;
 }
 
 .toggle-history-btn {
@@ -1558,12 +1603,11 @@ body {
     background: #fff;
     color: #333;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    transition: box-shadow 0.15s ease, background-color 0.15s ease;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .icon-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
     background-color: #f4f4f4;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
 }
@@ -1745,6 +1789,18 @@ body {
 .import-icon-btn:hover:not(:disabled) {
     background-color: #7b1fa2;
     box-shadow: 0 3px 8px rgba(156, 39, 176, 0.5);
+}
+
+.new-icon-btn {
+    background-color: #ff9800 !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(255, 152, 0, 0.3);
+}
+
+.new-icon-btn:hover:not(:disabled) {
+    background-color: #f57c00 !important;
+    box-shadow: 0 3px 8px rgba(255, 152, 0, 0.5);
 }
 
 .benchmark-status {
