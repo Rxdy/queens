@@ -41,12 +41,9 @@ def find_closest_zone_color(rgb_color):
     Trouve la couleur de zone la plus proche d'une couleur donnée.
     Retourne l'index de la zone (0-11) ou -1 si c'est du blanc (vide).
     """
-    # Vérifier si c'est blanc ou très proche du blanc
     r, g, b = rgb_color
-    if abs(r - 255) < 50 and abs(g - 255) < 50 and abs(b - 255) < 50:
-        return EMPTY_VALUE
     
-    # Trouver la couleur la plus proche
+    # D'abord, trouver la zone la plus proche
     min_distance = float('inf')
     closest_zone = 0
     
@@ -55,6 +52,22 @@ def find_closest_zone_color(rgb_color):
         if dist < min_distance:
             min_distance = dist
             closest_zone = zone_idx
+    
+    # Vérifier si c'est vraiment blanc (et pas juste une zone gris clair)
+    # Blanc pur = (255, 255, 255), on considère comme vide si TRÈS proche et NOT matching une zone
+    is_white_like = abs(r - 255) < 30 and abs(g - 255) < 30 and abs(b - 255) < 30
+    
+    # Si c'est blanc ET la distance à la couleur gris clair (zone 4) est grande, c'est vide
+    if is_white_like and min_distance > 20:
+        return EMPTY_VALUE
+    
+    # Logique spéciale pour gris pur: si R ≈ G ≈ B, préférer zone 4 (gris clair)
+    # Zone 4 = (240, 240, 240)
+    if abs(r - g) < 20 and abs(g - b) < 20 and abs(r - b) < 20:
+        gray_value = (r + g + b) // 3
+        # Si c'est un gris (170-240), retourner zone 4
+        if 170 <= gray_value <= 240:
+            return 4
     
     return closest_zone
 
@@ -118,29 +131,107 @@ def detect_grid_size(image_array):
     gray = np.mean(image_array, axis=2)
     black_pixels = gray < 50
     
-    # Compter les transitions verticales et horizontales
-    vertical_transitions = np.sum(np.diff(black_pixels.astype(int), axis=1) != 0)
-    horizontal_transitions = np.sum(np.diff(black_pixels.astype(int), axis=0) != 0)
+    # Ratio de pixels noirs par ligne et par colonne
+    row_black_ratio = np.mean(black_pixels, axis=1)
+    col_black_ratio = np.mean(black_pixels, axis=0)
     
-    # Estimer la taille basée sur les transitions
-    # Une grille n x n a (n+1) lignes/colonnes noires
-    estimated_size_v = max(2, (vertical_transitions // 50) + 1)
-    estimated_size_h = max(2, (horizontal_transitions // 50) + 1)
+    row_lines = np.where(row_black_ratio > 0.15)[0]
+    col_lines = np.where(col_black_ratio > 0.15)[0]
     
-    grid_size = max(estimated_size_v, estimated_size_h)
+    if len(row_lines) < 2 or len(col_lines) < 2:
+        return None
+    
+    row_groups = np.split(row_lines, np.where(np.diff(row_lines) > 1)[0] + 1)
+    col_groups = np.split(col_lines, np.where(np.diff(col_lines) > 1)[0] + 1)
+    
+    grid_size_v = max(0, len(row_groups) - 1)
+    grid_size_h = max(0, len(col_groups) - 1)
+    
+    if grid_size_v < 4 or grid_size_h < 4:
+        return None
+    
+    grid_size = min(grid_size_v, grid_size_h)
     
     # Limiter entre 4 et 15
     grid_size = max(4, min(15, grid_size))
     
-    logger.debug(f"Transitions détectées - V: {vertical_transitions}, H: {horizontal_transitions}")
-    logger.debug(f"Taille estimée: {grid_size}")
+    logger.debug(f"Lignes détectées - V: {len(row_groups)}, H: {len(col_groups)}")
+    logger.debug(f"Taille détectée: {grid_size}")
     
     return grid_size
 
 
 def extract_grid_cells(image_array, grid_size):
     """
-    Extrait les cellules de la grille et retourne une matrice de zones.
+    Extrait les cellules de la grille en utilisant les vraies positions des lignes noires.
+    """
+    height, width = image_array.shape[:2]
+    
+    # Détecter les vraies positions des lignes de grille noires
+    gray = np.mean(image_array, axis=2)
+    black_pixels = gray < 50
+    
+    row_lines = np.where(np.mean(black_pixels, axis=1) > 0.15)[0]
+    col_lines = np.where(np.mean(black_pixels, axis=0) > 0.15)[0]
+    
+    if len(row_lines) < 2 or len(col_lines) < 2:
+        logger.warning(f"Pas assez de lignes détectées: rows={len(row_lines)}, cols={len(col_lines)}")
+        return extract_grid_cells_fallback(image_array, grid_size)
+    
+    row_groups = np.split(row_lines, np.where(np.diff(row_lines) > 1)[0] + 1)
+    col_groups = np.split(col_lines, np.where(np.diff(col_lines) > 1)[0] + 1)
+    
+    # Positions des lignes de grille (première position de chaque groupe)
+    row_positions = [int(g[0]) for g in row_groups]
+    col_positions = [int(g[0]) for g in col_groups]
+    
+    # S'assurer qu'on a assez de positions
+    if len(row_positions) != grid_size + 1 or len(col_positions) != grid_size + 1:
+        logger.warning(f"Mismatch positions: rows={len(row_positions)} (expected {grid_size+1}), cols={len(col_positions)} (expected {grid_size+1})")
+        return extract_grid_cells_fallback(image_array, grid_size)
+    
+    zones = []
+    
+    for row in range(grid_size):
+        zone_row = []
+        
+        # Limites de la ligne (entre deux lignes noires, sans les bordures)
+        y_start = row_positions[row] + 3
+        y_end = row_positions[row + 1] - 3
+        
+        for col in range(grid_size):
+            # Limites de la colonne
+            x_start = col_positions[col] + 3
+            x_end = col_positions[col + 1] - 3
+            
+            # Extraire la région de la cellule
+            if y_end <= y_start or x_end <= x_start:
+                logger.debug(f"Cellule invalide à [{row}, {col}]: y=[{y_start}:{y_end}], x=[{x_start}:{x_end}]")
+                zone_row.append(EMPTY_VALUE)
+                continue
+            
+            cell_region = image_array[y_start:y_end, x_start:x_end]
+            
+            if cell_region.size == 0:
+                logger.warning(f"Cellule vide à [{row}, {col}]")
+                zone_row.append(EMPTY_VALUE)
+                continue
+            
+            # Calculer la couleur moyenne de la cellule
+            mean_color = np.mean(cell_region, axis=(0, 1)).astype(int)
+            
+            # Trouver la zone correspondante
+            zone = find_closest_zone_color(tuple(mean_color))
+            zone_row.append(zone)
+        
+        zones.append(zone_row)
+    
+    return zones
+
+
+def extract_grid_cells_fallback(image_array, grid_size):
+    """
+    Fallback: extrait les cellules en divisant simplement l'image.
     """
     height, width = image_array.shape[:2]
     
@@ -156,7 +247,7 @@ def extract_grid_cells(image_array, grid_size):
         zone_row = []
         
         # Limites de la ligne
-        y_start = int(row * cell_height + 5)  # Laisser 5px de marge pour les bordures
+        y_start = int(row * cell_height + 5)
         y_end = int((row + 1) * cell_height - 5)
         
         for col in range(grid_size):
@@ -168,7 +259,6 @@ def extract_grid_cells(image_array, grid_size):
             cell_region = image_array[y_start:y_end, x_start:x_end]
             
             if cell_region.size == 0:
-                logger.warning(f"Cellule vide à [{row}, {col}]")
                 zone_row.append(EMPTY_VALUE)
                 continue
             

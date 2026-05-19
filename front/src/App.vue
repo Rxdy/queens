@@ -15,8 +15,14 @@ const baselineResult = ref(null);
 const isBenchmarking = ref(false);
 const benchmarkStatus = ref("");
 const isImportModalOpen = ref(false);
+const importMode = ref("text");
 const importMatrixText = ref("");
 const importError = ref("");
+const importFile = ref(null);
+const importImagePreviewUrl = ref("");
+const importImageResult = ref(null);
+const importImageExtractError = ref("");
+const importImageLoading = ref(false);
 const showImportLegend = ref(false);
 const importPlaceholder = `Exemple :
 0 0 1 1
@@ -169,11 +175,32 @@ const importMatrixParseResult = computed(() => {
 });
 
 const importPreviewMatrix = computed(() => importMatrixParseResult.value.previewRows);
+const importImageMatrixPreview = computed(() => {
+    if (!importImageResult.value?.zones) return null;
+    return importImageResult.value.zones.map((row) =>
+        row.map((cell) => ({
+            raw: cell === -1 ? "-1" : String(cell),
+            value: cell,
+            valid: true,
+        }))
+    );
+});
+const activeImportPreviewMatrix = computed(() =>
+    importMode.value === "text" ? importPreviewMatrix.value : importImageMatrixPreview.value
+);
 const importIsValid = computed(
-    () => importMatrixText.value.trim().length > 0 && importMatrixParseResult.value.isValid
+    () =>
+        importMode.value === "text"
+            ? importMatrixText.value.trim().length > 0 && importMatrixParseResult.value.isValid
+            : !!importImageResult.value?.zones
 );
 const importParseError = computed(
-    () => (importMatrixText.value.trim().length > 0 ? importMatrixParseResult.value.error : null)
+    () =>
+        importMode.value === "text"
+            ? importMatrixText.value.trim().length > 0
+                ? importMatrixParseResult.value.error
+                : null
+            : importImageExtractError.value
 );
 
 const initializeZones = () => {
@@ -230,17 +257,77 @@ const formatTime = (seconds) => {
     return `${seconds.toFixed(3)} s`;
 };
 
+const resetImportImageState = () => {
+    if (importImagePreviewUrl.value) {
+        URL.revokeObjectURL(importImagePreviewUrl.value);
+    }
+    importFile.value = null;
+    importImagePreviewUrl.value = "";
+    importImageResult.value = null;
+    importImageExtractError.value = "";
+    importImageLoading.value = false;
+};
+
 const openImportModal = () => {
     isImportModalOpen.value = true;
+    importMode.value = "text";
     importMatrixText.value = "";
     importError.value = "";
     showImportLegend.value = false;
+    resetImportImageState();
 };
 
 const closeImportModal = () => {
     isImportModalOpen.value = false;
     importError.value = "";
     showImportLegend.value = false;
+    resetImportImageState();
+};
+
+const selectImportMode = (mode) => {
+    importMode.value = mode;
+    importError.value = "";
+    importImageExtractError.value = "";
+    if (mode === "photo") {
+        importMatrixText.value = "";
+    } else {
+        resetImportImageState();
+    }
+};
+
+const handleImportFileChange = (event) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    resetImportImageState();
+    importFile.value = file;
+    importImagePreviewUrl.value = URL.createObjectURL(file);
+};
+
+const uploadImportImage = async () => {
+    if (!importFile.value) return;
+    importImageExtractError.value = "";
+    importImageLoading.value = true;
+    try {
+        const formData = new FormData();
+        formData.append("file", importFile.value);
+
+        const response = await axios.post(
+            "http://localhost:8000/api/extract-matrix",
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
+
+        importImageResult.value = response.data;
+    } catch (err) {
+        importImageExtractError.value =
+            err?.response?.data?.detail || err.message || "Erreur lors de l'import de l'image.";
+    } finally {
+        importImageLoading.value = false;
+    }
 };
 
 const toggleImportLegend = () => {
@@ -330,7 +417,28 @@ const parseMatrixTextInputPreview = (text) => {
     ]);
 };
 
-const applyImportedMatrix = () => {
+const applyImportedMatrix = async () => {
+    if (importMode.value === "photo") {
+        if (!importImageResult.value?.zones) {
+            importImageExtractError.value =
+                "Aucune matrice extraite. Importez une photo valide avant de valider.";
+            return;
+        }
+
+        const matrix = importImageResult.value.zones;
+        size.value = matrix.length;
+        zones.value = matrix;
+        positions.value = [];
+        solutions.value = [];
+        selectedHistoryIndex.value = -1;
+        trmPerformance.value = null;
+        baselineResult.value = null;
+        errorMessage.value = "";
+        selectedColor.value = 0;
+        isImportModalOpen.value = false;
+        return;
+    }
+
     try {
         const matrix = parseMatrixTextInput(importMatrixText.value);
         size.value = matrix.length;
@@ -879,18 +987,29 @@ initializeHistoryVisibility();
                             class="icon-btn solve-icon-btn"
                             title="Résoudre"
                         >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 16.2l-3.5-3.5L4 14.2l5 5 12-12-1.4-1.4z" />
-                            </svg>
+                            <i class="ri-check-line" aria-hidden="true"></i>
                         </button>
                         <button
                             @click="resetGrid"
                             class="icon-btn reset-icon-btn"
                             title="Réinitialiser la grille"
                         >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 5V2L8 6l4 4V7c3.3 0 6 2.7 6 6 0 1.1-.3 2.2-.9 3.1l1.5 1.5C19.7 15.6 20 13.8 20 12c0-4.4-3.6-8-8-8zm-6.1 2.9L4.4 6.4C3.6 7.9 3 9.9 3 12c0 4.4 3.6 8 8 8v3l4-4-4-4v3c-3.3 0-6-2.7-6-6 0-1.1.3-2.2.9-3.1z" />
-                            </svg>
+                            <i class="ri-refresh-line" aria-hidden="true"></i>
+                        </button>
+                        <button
+                            @click="benchmarkAllSizes"
+                            class="icon-btn benchmark-icon-btn"
+                            :disabled="isBenchmarking"
+                            title="Benchmark 4-12"
+                        >
+                            <i class="ri-bar-chart-line" aria-hidden="true"></i>
+                        </button>
+                        <button
+                            @click="openImportModal"
+                            class="icon-btn import-icon-btn"
+                            title="Importer une image"
+                        >
+                            <i class="ri-upload-cloud-line" aria-hidden="true"></i>
                         </button>
                     </div>
                     <button
@@ -901,11 +1020,9 @@ initializeHistoryVisibility();
                         {{ historyVisible ? "Masquer" : "Afficher" }}
                         l'historique
                     </button>
-                </div>
-                <div class="debug-info">
-                    <small>
-                        Cell: {{ gridDebugInfo.calculatedCellSize }}px (calc) → {{ gridDebugInfo.actualCellSize }}px (real) | Grid: {{ gridDebugInfo.totalWidth }}×{{ gridDebugInfo.totalHeight }}px | {{ gridDebugInfo.message }}
-                    </small>
+                    <div v-if="benchmarkStatus" class="benchmark-status header-status">
+                        {{ benchmarkStatus }}
+                    </div>
                 </div>
                 <div
                     class="grid"
@@ -1042,48 +1159,56 @@ initializeHistoryVisibility();
                         @click="selectedColor = index"
                     ></div>
                 </div>
-                <div class="benchmark-panel">
-                    <button
-                        @click="benchmarkAllSizes"
-                        class="benchmark-btn"
-                        :disabled="isBenchmarking"
-                    >
-                        {{ isBenchmarking ? "Benchmark en cours..." : "Benchmark (4-12)" }}
-                    </button>
-                    <div v-if="benchmarkStatus" class="benchmark-status sidebar-status">
-                        {{ benchmarkStatus }}
-                    </div>
-                </div>
-                <button @click="openImportModal" class="import-btn">
-                    Importer une matrice
-                </button>
             </div>
         </div>
 
         <div v-if="isImportModalOpen" class="modal-overlay" @click.self="closeImportModal">
             <div class="modal-window">
-                <h3>Importer une matrice</h3>
-                <p>Collez une matrice carrée de taille minimale 4×4. Séparateurs supportés&nbsp;: espace, virgule ou point-virgule.</p>
+                <h3>Importer une image</h3>
+                <p v-if="importMode === 'text'">
+                    Collez une matrice carrée de taille minimale 4×4. Séparateurs supportés&nbsp;: espace, virgule ou point-virgule.
+                </p>
+                <p v-else>
+                    Importez une image de grille. Le backend analysera l'image et en extraira une matrice de zones.
+                </p>
                 <p class="modal-note">
-                    Une zone est définie par un même identifiant entier dans la matrice :
+                    Une zone est définie par un même identifiant entier :
                     <strong>0, 1, 2, ...</strong>. Le même nombre signifie la même zone/couleur.
                     Utilisez <strong>-1</strong> pour une cellule vide.
                 </p>
-                <button
-                    class="legend-toggle-btn"
-                    type="button"
-                    @click="toggleImportLegend"
-                >
-                    {{ showImportLegend ? "Masquer la légende" : "Afficher la légende" }}
-                </button>
+                <div class="import-mode-switch">
+                    <button
+                        type="button"
+                        class="mode-btn"
+                        :class="{ active: importMode === 'text' }"
+                        @click="selectImportMode('text')"
+                    >
+                        Matrice
+                    </button>
+                    <button
+                        type="button"
+                        class="mode-btn"
+                        :class="{ active: importMode === 'photo' }"
+                        @click="selectImportMode('photo')"
+                    >
+                        Image
+                    </button>
+                </div>
                 <div class="modal-import-content">
-                    <div class="import-textarea-panel">
+                    <div v-if="importMode === 'text'" class="import-textarea-panel">
                         <textarea
                             v-model="importMatrixText"
                             class="matrix-textarea"
                             :class="{ invalid: importParseError }"
                             :placeholder="importPlaceholder"
                         ></textarea>
+                        <button
+                            class="legend-toggle-btn"
+                            type="button"
+                            @click="toggleImportLegend"
+                        >
+                            {{ showImportLegend ? "Masquer la légende" : "Afficher la légende" }}
+                        </button>
                         <div v-if="showImportLegend" class="modal-legend">
                             <div class="legend-title">Légende de la matrice</div>
                             <div
@@ -1102,11 +1227,47 @@ initializeHistoryVisibility();
                             </div>
                         </div>
                     </div>
+                    <div v-else class="import-image-panel">
+                        <label class="file-input-label" for="photo-upload">
+                            Choisissez un fichier image
+                        </label>
+                        <input
+                            id="photo-upload"
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/gif"
+                            @change="handleImportFileChange"
+                        />
+                        <div class="image-input-note">
+                            Formats supportés : PNG, JPG, GIF.
+                        </div>
+                        <button
+                            class="solve-btn"
+                            type="button"
+                            @click="uploadImportImage"
+                            :disabled="!importFile || importImageLoading"
+                        >
+                            {{ importImageLoading ? 'Extraction...' : 'Extraire depuis l’image' }}
+                        </button>
+                        <div v-if="importImagePreviewUrl" class="image-preview">
+                            <img
+                                :src="importImagePreviewUrl"
+                                alt="Aperçu de l'image importée"
+                            />
+                        </div>
+                        <div v-if="importImageResult" class="image-result">
+                            <div>
+                                <strong>Taille :</strong> {{ importImageResult.size }}×{{ importImageResult.size }}
+                            </div>
+                            <div>
+                                <strong>Confiance :</strong> {{ (importImageResult.confidence * 100).toFixed(0) }}%
+                            </div>
+                        </div>
+                    </div>
                     <div class="import-preview">
                         <div class="legend-title">Prévisualisation</div>
-                        <div v-if="importPreviewMatrix" class="import-preview-grid">
+                        <div v-if="activeImportPreviewMatrix" class="import-preview-grid">
                             <div
-                                v-for="(row, rowIndex) in importPreviewMatrix"
+                                v-for="(row, rowIndex) in activeImportPreviewMatrix"
                                 :key="rowIndex"
                                 class="import-preview-row"
                                 :style="{ gridTemplateColumns: `repeat(${row.length}, minmax(18px, 1fr))` }"
@@ -1116,17 +1277,10 @@ initializeHistoryVisibility();
                                     :key="colIndex"
                                     class="import-preview-cell"
                                     :style="{
-                                        backgroundColor: !cell.valid
-                                            ? '#ffecec'
-                                            : cell.value === -1
-                                            ? '#fff'
-                                            : colors[cell.value],
-                                        color: !cell.valid
-                                            ? '#b71c1c'
-                                            : cell.value === -1
-                                            ? '#999'
-                                            : '#000',
-                                        borderColor: !cell.valid ? '#d32f2f' : cell.value === -1 ? '#ccc' : '#000'
+                                        backgroundColor:
+                                            cell.value === -1 ? '#fff' : colors[cell.value],
+                                        color: cell.value === -1 ? '#999' : '#000',
+                                        borderColor: cell.value === -1 ? '#ccc' : '#000'
                                     }"
                                 >
                                     {{ cell.raw === '' ? '-' : cell.raw }}
@@ -1134,7 +1288,9 @@ initializeHistoryVisibility();
                             </div>
                         </div>
                         <div v-else class="preview-empty">
-                            Entrez une matrice valide pour voir l’aperçu.
+                            {{ importMode === 'text'
+                                ? 'Entrez une matrice valide pour voir l’aperçu.'
+                                : 'Importez une photo et extrayez la matrice pour voir l’aperçu.' }}
                         </div>
                     </div>
                 </div>
@@ -1399,10 +1555,13 @@ body {
     cursor: not-allowed;
 }
 
-.icon-btn svg {
+.icon-btn svg,
+.icon-btn i {
     width: 20px;
     height: 20px;
-    fill: currentColor;
+    line-height: 1;
+    font-size: 1.2rem;
+    color: currentColor;
 }
 
 .solve-icon-btn {
@@ -1413,16 +1572,6 @@ body {
 .reset-icon-btn {
     color: #d32f2f;
     border-color: rgba(211, 47, 47, 0.2);
-}
-
-.debug-info {
-    margin-top: 10px;
-    padding: 8px;
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #333;
 }
 
 .grid {
@@ -1517,27 +1666,46 @@ body {
     background-color: #b71c1c;
 }
 
-.benchmark-btn {
-    padding: 1vh 2vw;
-    font-size: 1rem;
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    background: #fff;
+    color: #333;
     cursor: pointer;
-    background-color: #2196f3;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    transition: background-color 0.3s;
-    margin-top: 1vh;
-    font-weight: bold;
-    width: 100%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-.benchmark-btn:hover:not(:disabled) {
-    background-color: #0b7dda;
+.icon-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background-color: #f4f4f4;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
 }
 
-.benchmark-btn:disabled {
-    background-color: #90caf9;
+.icon-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
+}
+
+.icon-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+.benchmark-icon-btn {
+    color: #1565c0;
+    border-color: rgba(21, 101, 192, 0.2);
+}
+
+.import-icon-btn {
+    color: #6a1b9a;
+    border-color: rgba(106, 27, 154, 0.2);
 }
 
 .benchmark-status {
@@ -1552,30 +1720,6 @@ body {
     font-weight: 500;
 }
 
-.benchmark-panel {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.import-btn {
-    width: 100%;
-    padding: 1vh 2vw;
-    margin-top: 1.5vh;
-    font-size: 1rem;
-    cursor: pointer;
-    background-color: #795548;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    transition: background-color 0.3s;
-    font-weight: bold;
-}
-
-.import-btn:hover {
-    background-color: #5d4037;
-}
 
 .modal-overlay {
     position: fixed;
@@ -1653,6 +1797,68 @@ body {
 .modal-actions .solve-btn,
 .modal-actions .reset-btn {
     width: auto;
+}
+
+.import-mode-switch {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mode-btn {
+    flex: 1;
+    border: 1px solid #c5cfe8;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    background: #fff;
+    color: #1f2937;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.mode-btn.active {
+    background: #1976d2;
+    color: #fff;
+    border-color: #115293;
+}
+
+.import-image-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.file-input-label {
+    font-weight: 700;
+}
+
+.image-input-note {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.image-preview {
+    border: 1px solid #d0d8f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: #fff;
+}
+
+.image-preview img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+.image-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid #d5dcef;
+    border-radius: 10px;
+    background: #f7f9ff;
 }
 
 .legend-toggle-btn {
@@ -1764,6 +1970,11 @@ body {
 .modal-legend .legend-color.empty-cell {
     background: #ffffff;
     border-color: #999;
+}
+
+.header-status {
+    width: 100%;
+    margin-top: 0.75rem;
 }
 
 .sidebar-status {
