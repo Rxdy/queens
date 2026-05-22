@@ -1332,6 +1332,26 @@ if (drafts.value.length === 0) {
                         </li>
                     </ul>
                 </div>
+                <div class="welcome-section">
+                    <h4>5. Brouillons</h4>
+                    <p>
+                        Chaque nouvelle grille crée un brouillon enregistré en bas de l'écran.
+                        Vous pouvez basculer entre plusieurs brouillons comme des onglets,
+                        et supprimer ceux dont vous n'avez plus besoin.
+                    </p>
+                    <ul>
+                        <li>
+                            Les brouillons sont visibles dans le panneau en bas, en tant qu'onglets.
+                        </li>
+                        <li>
+                            La grille en cours est automatiquement sauvegardée lorsque vous changez de brouillon.
+                        </li>
+                        <li>
+                            Il y a une limite de <strong>15 brouillons</strong> maximum,
+                            les plus anciens sont supprimés au-delà de ce nombre.
+                        </li>
+                    </ul>
+                </div>
                 <div class="welcome-actions">
                     <button class="solve-btn" type="button" @click="closeCurrentModal">
                         {{ showWelcomeModal ? 'J\'ai compris, continuer' : 'Fermer l\'aide' }}
