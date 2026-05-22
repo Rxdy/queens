@@ -4,6 +4,8 @@ Routes API pour TRM Solver
 from fastapi import APIRouter, HTTPException, UploadFile, File
 import logging
 import time
+import os
+from pathlib import Path
 
 from api.models import GridInput, Solution, PerformanceMetrics, ExtractedMatrix
 from core.solver import QueensSolver
@@ -134,4 +136,42 @@ async def health():
         "service": "TRM Solver",
         "max_iterations": MAX_ITERATIONS
     }
+
+
+@router.post("/save-test-image")
+async def save_test_image(file: UploadFile = File(...)):
+    """
+    Enregistre une image de test dans le dossier test_images/
+    
+    Args:
+        file: Fichier image (PNG) à enregistrer
+    
+    Returns:
+        Confirmation d'enregistrement
+    """
+    try:
+        # Créer le dossier test_images s'il n'existe pas
+        test_images_dir = Path("test_images")
+        test_images_dir.mkdir(exist_ok=True)
+        
+        # Générer le chemin du fichier
+        filename = file.filename or f"test_image_{int(time.time())}.png"
+        filepath = test_images_dir / filename
+        
+        # Lire et enregistrer le fichier
+        content = await file.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+        
+        logger.info(f"✅ Image de test enregistrée: {filepath}")
+        
+        return {
+            "status": "success",
+            "filename": str(filepath),
+            "size": len(content)
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de l'enregistrement de l'image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement: {str(e)}")
 

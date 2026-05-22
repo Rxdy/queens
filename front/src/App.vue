@@ -476,49 +476,50 @@ const downloadGridAsImage = () => {
 
     const gridSize = zones.value.length;
     const cellSize = 60;
-    const padding = 10;
-    const borderWidth = 3;
-    const totalSize = gridSize * cellSize + 2 * padding + 2 * borderWidth;
+    const borderWidth = 5;
+    const margin = 20;
+    const gridTotalSize = gridSize * cellSize + 2 * borderWidth;
+    const canvasSize = gridTotalSize + 2 * margin;
 
     // Créer un canvas
     const canvas = document.createElement("canvas");
-    canvas.width = totalSize;
-    canvas.height = totalSize;
+    canvas.width = canvasSize;
+    canvas.height = canvasSize;
     const ctx = canvas.getContext("2d");
 
     if (!ctx) return;
 
-    // Fond blanc
+    // Fond blanc (incluant la marge)
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, totalSize, totalSize);
-
-    // Bordure noire
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = borderWidth;
-    ctx.strokeRect(
-        borderWidth / 2,
-        borderWidth / 2,
-        gridSize * cellSize + 2 * padding,
-        gridSize * cellSize + 2 * padding
-    );
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
 
     // Dessiner les cellules
     zones.value.forEach((row, r) => {
         row.forEach((cellColor, c) => {
-            const x = padding + borderWidth + c * cellSize;
-            const y = padding + borderWidth + r * cellSize;
+            const x = margin + borderWidth + c * cellSize;
+            const y = margin + borderWidth + r * cellSize;
 
             // Remplir avec la couleur
             const color = cellColor === -1 ? "#fff" : colors[cellColor];
             ctx.fillStyle = color;
             ctx.fillRect(x, y, cellSize, cellSize);
 
-            // Bordure de la cellule
-            ctx.strokeStyle = "#999";
-            ctx.lineWidth = 1;
+            // Bordure de la cellule (traits noirs)
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 2;
             ctx.strokeRect(x, y, cellSize, cellSize);
         });
     });
+
+    // Bordure noire de 5px autour de la grille
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = borderWidth;
+    ctx.strokeRect(
+        margin + borderWidth / 2,
+        margin + borderWidth / 2,
+        gridSize * cellSize,
+        gridSize * cellSize
+    );
 
     // Télécharger l'image
     canvas.toBlob((blob) => {
@@ -531,6 +532,18 @@ const downloadGridAsImage = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
+        // Aussi enregistrer dans le dossier test_images/ via API
+        canvas.toBlob((testBlob) => {
+            const formData = new FormData();
+            formData.append('file', testBlob, `test_${gridSize}x${gridSize}.png`);
+            fetch('/api/save-test-image', {
+                method: 'POST',
+                body: formData
+            }).catch(() => {
+                // Silencieusement ignorer si l'endpoint n'existe pas
+            });
+        });
     });
 };
 
