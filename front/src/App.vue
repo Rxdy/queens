@@ -15,6 +15,8 @@ const baselineResult = ref(null);
 const isBenchmarking = ref(false);
 const benchmarkStatus = ref("");
 const isImportModalOpen = ref(false);
+const showWelcomeModal = ref(true);
+const showHelpModal = ref(false);
 const importMode = ref("text");
 const importMatrixText = ref("");
 const importError = ref("");
@@ -33,7 +35,13 @@ const importPlaceholder = `Exemple :
 const isMobile = computed(() => windowWidth.value < 600);
 const currentSolutionIndex = ref(0);
 const isPainting = ref(false);
+const currentMouseButton = ref(null);
 const selectedHistoryIndex = ref(-1);
+
+// Brouillons (drafts)
+const drafts = ref([]);
+const currentDraftIndex = ref(-1);
+const MAX_DRAFTS = 15;
 
 // Dimensions de l'écran réactives
 const screenWidth = ref(1200);
@@ -65,8 +73,8 @@ const colors = [
     "rgb(210, 180, 200)",
 ];
 
-// Couleurs disponibles selon la taille de la grille et l'état actuel
-const availableColors = computed(() => {
+// Couleurs disponibles et leurs indices
+const availableColorIndices = computed(() => {
     if (!zones.value) return [];
 
     const usedColorsInGrid = new Set(
@@ -76,11 +84,16 @@ const availableColors = computed(() => {
 
     if (usedColorsInGrid.size < maxColors) {
         // On peut encore ajouter des couleurs, toutes sont disponibles
-        return colors;
+        return Array.from({ length: colors.length }, (_, i) => i);
     } else {
         // On a atteint la limite, seules les couleurs utilisées restent disponibles
-        return colors.filter((_, index) => usedColorsInGrid.has(index));
+        return Array.from(usedColorsInGrid).sort((a, b) => a - b);
     }
+});
+
+// Couleurs disponibles selon la taille de la grille et l'état actuel
+const availableColors = computed(() => {
+    return availableColorIndices.value.map(index => colors[index]);
 });
 
 const importLegendItems = computed(() => {
@@ -206,27 +219,108 @@ const importParseError = computed(
 const initializeZones = () => {
     zones.value = Array.from({ length: size.value }, () =>
         Array(size.value).fill(-1)
-    ); // -1 pour cases vides
+    );
     positions.value = [];
     solutions.value = [];
     selectedHistoryIndex.value = -1;
     trmPerformance.value = null;
     baselineResult.value = null;
-    errorMessage.value = ""; // Vider le message d'erreur
+    errorMessage.value = "";
     isPainting.value = false;
-    // Réinitialiser la couleur sélectionnée si elle dépasse la limite
     if (selectedColor.value >= size.value) {
         selectedColor.value = 0;
     }
 };
 
-const clickCell = (row, col) => {
-    if (isViewingHistory.value) return; // Empêcher les modifications en visualisant un historique
-    if (zones.value[row][col] === selectedColor.value) {
-        zones.value[row][col] = -1; // Remettre à vide
-    } else {
-        zones.value[row][col] = selectedColor.value;
+const saveDraft = () => {
+    if (currentDraftIndex.value >= 0 && drafts.value[currentDraftIndex.value]) {
+        drafts.value[currentDraftIndex.value] = {
+            ...drafts.value[currentDraftIndex.value],
+            size: size.value,
+            zones: zones.value.map((row) => [...row]),
+            selectedColor: selectedColor.value,
+            updatedAt: new Date().toLocaleString("fr-FR"),
+        };
     }
+};
+
+const createNewDraft = () => {
+    saveDraft();
+    
+    const newDraft = {
+        id: Date.now(),
+        size: 8,
+        zones: Array.from({ length: 8 }, () => Array(8).fill(-1)),
+        selectedColor: 0,
+        createdAt: new Date().toLocaleString("fr-FR"),
+        updatedAt: new Date().toLocaleString("fr-FR"),
+    };
+    
+    drafts.value.unshift(newDraft);
+    
+    // Limiter le nombre de brouillons à MAX_DRAFTS
+    // Si dépassement, supprimer les plus anciens
+    if (drafts.value.length > MAX_DRAFTS) {
+        const excess = drafts.value.length - MAX_DRAFTS;
+        drafts.value.splice(-excess);
+    }
+    
+    currentDraftIndex.value = 0;
+    size.value = newDraft.size;
+    zones.value = newDraft.zones.map((row) => [...row]);
+    selectedColor.value = newDraft.selectedColor;
+    initializeZones();
+};
+
+const switchDraft = (index) => {
+    if (index === currentDraftIndex.value) return;
+    
+    saveDraft();
+    
+    const draft = drafts.value[index];
+    if (!draft) return;
+    
+    currentDraftIndex.value = index;
+    size.value = draft.size;
+    zones.value = draft.zones.map((row) => [...row]);
+    selectedColor.value = draft.selectedColor;
+    positions.value = [];
+    solutions.value = [];
+    selectedHistoryIndex.value = -1;
+    trmPerformance.value = null;
+    baselineResult.value = null;
+    errorMessage.value = "";
+};
+
+const deleteDraft = (index) => {
+    drafts.value.splice(index, 1);
+    if (currentDraftIndex.value === index) {
+        if (drafts.value.length > 0) {
+            switchDraft(0);
+        } else {
+            currentDraftIndex.value = -1;
+            initializeZones();
+        }
+    } else if (currentDraftIndex.value > index) {
+        currentDraftIndex.value--;
+    }
+};
+
+const clearForNewGrid = () => {
+    createNewDraft();
+};
+
+const clickCell = (row, col, button) => {
+    if (isViewingHistory.value) return;
+    
+    if (button === 0) {
+        // Clique gauche : peindre avec la couleur sélectionnée
+        zones.value[row][col] = selectedColor.value;
+    } else if (button === 2) {
+        // Clique droit : effacer la case
+        zones.value[row][col] = -1;
+    }
+    
     errorMessage.value = ""; // Vider le message d'erreur lors de modification
     positions.value = []; // Vider les positions des reines
     solutions.value = []; // Vider les solutions
@@ -236,19 +330,22 @@ const clickCell = (row, col) => {
     baselineResult.value = null;
 };
 
-const onMouseDown = (row, col) => {
+const onMouseDown = (row, col, event) => {
+    event.preventDefault(); // Prévenir le menu contextuel pour clique droit
+    currentMouseButton.value = event.button;
     isPainting.value = true;
-    clickCell(row, col);
+    clickCell(row, col, event.button);
 };
 
 const onMouseEnter = (row, col) => {
-    if (isPainting.value) {
-        clickCell(row, col);
+    if (isPainting.value && currentMouseButton.value !== null) {
+        clickCell(row, col, currentMouseButton.value);
     }
 };
 
 const onMouseUp = () => {
     isPainting.value = false;
+    currentMouseButton.value = null;
 };
 
 const formatTime = (seconds) => {
@@ -284,6 +381,26 @@ const closeImportModal = () => {
     importError.value = "";
     showImportLegend.value = false;
     resetImportImageState();
+};
+
+const closeWelcomeModal = () => {
+    showWelcomeModal.value = false;
+};
+
+const openHelpModal = () => {
+    showHelpModal.value = true;
+};
+
+const closeHelpModal = () => {
+    showHelpModal.value = false;
+};
+
+const closeCurrentModal = () => {
+    if (showWelcomeModal.value) {
+        showWelcomeModal.value = false;
+    } else if (showHelpModal.value) {
+        showHelpModal.value = false;
+    }
 };
 
 const selectImportMode = (mode) => {
@@ -334,6 +451,87 @@ const uploadImportImage = async () => {
 
 const toggleImportLegend = () => {
     showImportLegend.value = !showImportLegend.value;
+};
+
+const copyMatrixToClipboard = async () => {
+    if (!zones.value || zones.value.length === 0) {
+        return;
+    }
+
+    const matrixText = zones.value
+        .map((row) => row.join(" "))
+        .join("\n");
+
+    try {
+        await navigator.clipboard.writeText(matrixText);
+    } catch (err) {
+        console.error("Erreur lors de la copie:", err);
+    }
+};
+
+const downloadGridAsImage = () => {
+    if (!zones.value || zones.value.length === 0) {
+        return;
+    }
+
+    const gridSize = zones.value.length;
+    const cellSize = 60;
+    const padding = 10;
+    const borderWidth = 3;
+    const totalSize = gridSize * cellSize + 2 * padding + 2 * borderWidth;
+
+    // Créer un canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = totalSize;
+    canvas.height = totalSize;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    // Fond blanc
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, totalSize, totalSize);
+
+    // Bordure noire
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = borderWidth;
+    ctx.strokeRect(
+        borderWidth / 2,
+        borderWidth / 2,
+        gridSize * cellSize + 2 * padding,
+        gridSize * cellSize + 2 * padding
+    );
+
+    // Dessiner les cellules
+    zones.value.forEach((row, r) => {
+        row.forEach((cellColor, c) => {
+            const x = padding + borderWidth + c * cellSize;
+            const y = padding + borderWidth + r * cellSize;
+
+            // Remplir avec la couleur
+            const color = cellColor === -1 ? "#fff" : colors[cellColor];
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, cellSize, cellSize);
+
+            // Bordure de la cellule
+            ctx.strokeStyle = "#999";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, cellSize, cellSize);
+        });
+    });
+
+    // Télécharger l'image
+    canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `queens-grid-${gridSize}x${gridSize}-${new Date().toISOString().slice(0, 10)}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
 };
 
 const parseMatrixTextInput = (text) => {
@@ -517,11 +715,26 @@ const submit = async () => {
             errorMessage.value = "";
             currentSolutionIndex.value = 0;
             positions.value = solutions.value[0];
+            
+            // Préparer les temps du baseline si disponibles
+            let baselineTime = null;
+            let baselineValid = false;
+            let baselineSolutionsCount = 0;
+            if (baselineRes.status === "fulfilled") {
+                baselineTime = baselineRes.value.data?.performance?.execution_time ?? null;
+                baselineValid = baselineRes.value.data?.performance?.valid ?? false;
+                baselineSolutionsCount = baselineRes.value.data?.performance?.solutions_count ?? 0;
+            }
+            
             history.value.unshift({
                 grid: zones.value.map((row) => [...row]),
                 solutions: solutions.value.map((sol) => [...sol]),
                 timestamp: new Date().toLocaleString("fr-FR"),
                 size: size.value,
+                trmTime: trmPerformance.value?.execution_time,
+                baselineTime,
+                baselineValid,
+                baselineSolutionsCount,
             });
         }
     } else {
@@ -703,17 +916,6 @@ const toggleHistorySelection = (entry, index) => {
         // Charger l'historique
         loadFromHistory(entry, index);
     }
-};
-
-const clearForNewGrid = () => {
-    initializeZones();
-    selectedHistoryIndex.value = -1;
-    solutions.value = [];
-    positions.value = [];
-    errorMessage.value = "";
-    currentSolutionIndex.value = 0;
-    trmPerformance.value = null;
-    baselineResult.value = null;
 };
 
 // Génère N zones connexes aléatoires couvrant toutes les cellules (règle du jeu).
@@ -985,13 +1187,145 @@ watch(isMobile, (newIsMobile) => {
     }
 });
 
+// Auto-save des brouillons
+watch(zones, () => {
+    if (currentDraftIndex.value >= 0) {
+        saveDraft();
+    }
+}, { deep: true });
+
 initializeZones();
 initializeHistoryVisibility();
+// Créer le premier brouillon
+if (drafts.value.length === 0) {
+    createNewDraft();
+}
 </script>
 
 <template>
     <div class="app">
         <h1 class="title">Queens Game Solveur</h1>
+        <div v-if="showWelcomeModal || showHelpModal" class="modal-overlay" @click.self="closeCurrentModal">
+            <div class="modal-window welcome-window">
+                <h3>{{ showWelcomeModal ? 'Bienvenue dans le solveur' : 'Aide' }}</h3>
+                <p class="welcome-intro">
+                    Ce guide vous aide à démarrer : colorier les zones, choisir la taille,
+                    utiliser les boutons, consulter l'historique et importer une grille par matrice ou photo.
+                </p>
+                <div class="welcome-section">
+                    <h4>1. Colorier la grille</h4>
+                    <p>
+                        Choisissez une couleur dans la palette à droite, puis utilisez les cliques pour remplir la grille :
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li><strong>Clique gauche</strong> : peint la case avec la couleur sélectionnée</li>
+                            <li><strong>Clique droit</strong> : efface la case</li>
+                            <li><strong>Rester enfoncé et glisser</strong> : continue l'action sur plusieurs cases</li>
+                        </ul>
+                        Chaque couleur représente une zone. Le sélecteur <strong>Taille</strong> permet de définir
+                        la taille de la grille avant de commencer.
+                    </p>
+                </div>
+                <div class="welcome-section">
+                    <h4>2. Boutons principaux</h4>
+                    <div class="welcome-buttons">
+                        <div class="welcome-action">
+                            <button class="guide-btn new-icon-btn" disabled>
+                                <i class="ri-add-line"></i>
+                            </button>
+                            <div>
+                                <strong>Nouvelle grille</strong><br />Crée une grille vide pour repartir à zéro.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn solve-icon-btn">
+                                <i class="ri-check-line"></i>
+                            </button>
+                            <div>
+                                <strong>Résoudre</strong><br />Lance le solveur et compare TRM / baseline.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn reset-icon-btn">
+                                <i class="ri-refresh-line"></i>
+                            </button>
+                            <div>
+                                <strong>Réinitialiser</strong><br />Vide la grille actuelle sans changer la taille.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn benchmark-icon-btn" disabled>
+                                <i class="ri-bar-chart-line"></i>
+                            </button>
+                            <div>
+                                <strong>Benchmark aléatoire</strong><br />Test du solveur sur plusieurs tailles variées de manière aléatoire.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn import-icon-btn" disabled>
+                                <i class="ri-upload-cloud-line"></i>
+                            </button>
+                            <div>
+                                <strong>Importer</strong><br />Ouvre le panneau pour charger une matrice ou une image.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn copy-icon-btn" disabled>
+                                <i class="ri-file-copy-line"></i>
+                            </button>
+                            <div>
+                                <strong>Copier la matrice</strong><br />Copie la configuration actuelle de la grille au presse-papiers.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn download-icon-btn" disabled>
+                                <i class="ri-download-line"></i>
+                            </button>
+                            <div>
+                                <strong>Télécharger en image</strong><br />Télécharge la grille actuelle au format PNG pour la partager ou l'importer plus tard.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
+                            <button class="guide-btn help-icon-btn">
+                                <i class="ri-question-line"></i>
+                            </button>
+                            <div>
+                                <strong>Afficher l'aide</strong><br />Ouvre ce guide pour consulter l'aide.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="welcome-section">
+                    <h4>3. Historique</h4>
+                    <p>
+                        Chaque grille résolue est sauvegardée dans l'<strong>historique</strong> de votre session.
+                        L'historique affiche le nombre de solutions trouvées et les temps d'exécution du TRM et du baseline.
+                        Cliquez sur une entrée de l'historique pour visualiser les solutions d'une grille antérieure.
+                    </p>
+                </div>
+                <div class="welcome-section">
+                    <h4>4. Système d'import</h4>
+                    <p>
+                        Deux modes sont disponibles : <strong>Matrice</strong> et <strong>Image</strong>.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Matrice</strong> : collez un tableau carré de nombres comme
+                            <code>0 0 1 1</code> ou <code>0,1,-1,2</code>.
+                            <em>-1</em> signifie case vide, les autres nombres définissent les zones.
+                        </li>
+                        <li>
+                            <strong>Image</strong> : sélectionnez une photo de la grille.
+                            Le backend analyse l'image et en extrait automatiquement la matrice de zones.
+                        </li>
+                    </ul>
+                </div>
+                <div class="welcome-actions">
+                    <button class="solve-btn" type="button" @click="closeCurrentModal">
+                        {{ showWelcomeModal ? 'J\'ai compris, continuer' : 'Fermer l\'aide' }}
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="main-layout" :class="{ 'history-hidden': !historyVisible }">
             <div v-if="historyVisible" class="history-panel">
                 <h3>Historique</h3>
@@ -1069,6 +1403,27 @@ initializeHistoryVisibility();
                         >
                             <i class="ri-upload-cloud-line" aria-hidden="true"></i>
                         </button>
+                        <button
+                            @click="copyMatrixToClipboard"
+                            class="icon-btn copy-icon-btn"
+                            title="Copier la matrice"
+                        >
+                            <i class="ri-file-copy-line" aria-hidden="true"></i>
+                        </button>
+                        <button
+                            @click="downloadGridAsImage"
+                            class="icon-btn download-icon-btn"
+                            title="Télécharger la grille en image"
+                        >
+                            <i class="ri-download-line" aria-hidden="true"></i>
+                        </button>
+                        <button
+                            @click="openHelpModal"
+                            class="icon-btn help-icon-btn"
+                            title="Afficher l'aide"
+                        >
+                            <i class="ri-question-line" aria-hidden="true"></i>
+                        </button>
                     </div>
                     <button
                         v-if="windowWidth < 600"
@@ -1101,9 +1456,10 @@ initializeHistoryVisibility();
                             :key="c"
                             class="cell"
                             :style="getCellStyle(r, c)"
-                            @mousedown="onMouseDown(r, c)"
+                            @mousedown="onMouseDown(r, c, $event)"
                             @mouseenter="onMouseEnter(r, c)"
                             @mouseup="onMouseUp"
+                            @contextmenu.prevent
                         >
                             <svg
                                 v-if="
@@ -1209,13 +1565,38 @@ initializeHistoryVisibility();
                 </div>
                 <div class="palette">
                     <div
-                        v-for="(color, index) in availableColors"
-                        :key="index"
+                        v-for="(colorIndex, visibleIndex) in availableColorIndices"
+                        :key="colorIndex"
                         class="color-btn"
-                        :class="{ selected: selectedColor === index }"
-                        :style="{ backgroundColor: color }"
-                        @click="selectedColor = index"
+                        :class="{ selected: selectedColor === colorIndex }"
+                        :style="{ backgroundColor: colors[colorIndex] }"
+                        @click="selectedColor = colorIndex"
                     ></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Onglets de brouillons - FIXE en bas -->
+        <div v-if="drafts.length > 0" class="drafts-panel">
+            <div class="drafts-tabs">
+                <div
+                    v-for="(draft, index) in drafts"
+                    :key="draft.id"
+                    class="draft-tab"
+                    :class="{ active: currentDraftIndex === index }"
+                    @click="switchDraft(index)"
+                >
+                    <div class="draft-info">
+                        <span class="draft-size">{{ draft.size }}×{{ draft.size }}</span>
+                        <span class="draft-time">{{ draft.updatedAt }}</span>
+                    </div>
+                    <button
+                        @click.stop="deleteDraft(index)"
+                        class="draft-delete-btn"
+                        title="Supprimer ce brouillon"
+                    >
+                        ×
+                    </button>
                 </div>
             </div>
         </div>
@@ -1397,12 +1778,12 @@ body {
     align-items: center;
     padding: 1vh 1vw;
     background-color: #f5f5f5;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .title {
     text-align: center;
-    margin-bottom: 2vh;
+    margin-bottom: 1vh;
     color: #333;
     font-size: 2rem;
     font-weight: bold;
@@ -1415,8 +1796,10 @@ body {
     align-items: flex-start;
     gap: 2vw;
     width: 98vw;
-    height: 75vh;
+    height: auto;
+    flex: 1;
     max-width: 1400px;
+    overflow: auto;
 }
 
 .main-layout.history-hidden {
@@ -1743,6 +2126,92 @@ body {
     max-width: 80vw;
 }
 
+.drafts-panel {
+    width: 98vw;
+    max-width: 1400px;
+    padding: 1vh 1.5vw;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border-top: 2px solid #e0e0e0;
+    flex-shrink: 0;
+    margin-top: 1vh;
+    overflow: visible;
+}
+
+.drafts-tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.draft-tab {
+    flex-shrink: 0;
+    padding: 0.8rem 1rem;
+    background-color: #fff;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+
+.draft-tab:hover {
+    border-color: #999;
+    background-color: #f9f9f9;
+}
+
+.draft-tab.active {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+    color: #1976d2;
+    font-weight: 600;
+}
+
+.draft-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.draft-size {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.draft-time {
+    font-size: 0.75rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.draft-delete-btn {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #999;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.draft-delete-btn:hover {
+    color: #d32f2f;
+}
+
 .reset-btn {
     padding: 1vh 2vw;
     font-size: 1rem;
@@ -1791,6 +2260,42 @@ body {
     box-shadow: 0 3px 8px rgba(156, 39, 176, 0.5);
 }
 
+.help-icon-btn {
+    background-color: #00bcd4 !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0, 188, 212, 0.3);
+}
+
+.help-icon-btn:hover:not(:disabled) {
+    background-color: #0097a7 !important;
+    box-shadow: 0 3px 8px rgba(0, 188, 212, 0.5);
+}
+
+.copy-icon-btn {
+    background-color: #2196f3 !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(33, 150, 243, 0.3);
+}
+
+.copy-icon-btn:hover:not(:disabled) {
+    background-color: #1976d2 !important;
+    box-shadow: 0 3px 8px rgba(33, 150, 243, 0.5);
+}
+
+.download-icon-btn {
+    background-color: #ff6f00 !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 2px 6px rgba(255, 111, 0, 0.3);
+}
+
+.download-icon-btn:hover:not(:disabled) {
+    background-color: #e65100 !important;
+    box-shadow: 0 3px 8px rgba(255, 111, 0, 0.5);
+}
+
 .new-icon-btn {
     background-color: #ff9800 !important;
     color: #fff !important;
@@ -1802,6 +2307,7 @@ body {
     background-color: #f57c00 !important;
     box-shadow: 0 3px 8px rgba(255, 152, 0, 0.5);
 }
+
 
 .benchmark-status {
     margin-top: 1vh;
@@ -1840,6 +2346,103 @@ body {
 .modal-window h3 {
     margin-top: 0;
     margin-bottom: 0.75rem;
+}
+
+.welcome-window {
+    max-width: 760px;
+}
+
+.welcome-intro {
+    margin-bottom: 1rem;
+    color: #444;
+    font-size: 0.98rem;
+}
+
+.welcome-section {
+    margin-bottom: 1.2rem;
+}
+
+.welcome-section h4 {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    color: #111;
+}
+
+.welcome-section p,
+.welcome-section ul {
+    margin: 0;
+    color: #444;
+    line-height: 1.55;
+    font-size: 0.95rem;
+}
+
+.welcome-section ul {
+    padding-left: 1.2rem;
+    margin-top: 0.7rem;
+}
+
+.welcome-section li {
+    margin-bottom: 0.7rem;
+}
+
+.welcome-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.welcome-action {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    padding: 1rem;
+    border: 1px solid #e3e8f0;
+    border-radius: 14px;
+    background: #fbfbff;
+}
+
+.guide-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: none;
+    color: #fff;
+    cursor: default;
+    opacity: 1;
+}
+
+.welcome-action .guide-btn i {
+    font-size: 1.1rem;
+}
+
+.welcome-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.welcome-actions .solve-btn {
+    padding: 0.95rem 1.5rem;
+}
+
+.welcome-window code {
+    background: #f1f5f9;
+    color: #1f2937;
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+    font-size: 0.92rem;
+}
+
+@media (max-width: 800px) {
+    .welcome-buttons {
+        grid-template-columns: 1fr;
+    }
 }
 
 .modal-window p {
