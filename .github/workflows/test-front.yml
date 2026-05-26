@@ -1,0 +1,62 @@
+name: 🧪 Tests - Service Front
+
+on:
+  push:
+    paths:
+      - 'front/**'
+      - '.github/workflows/test-front.yml'
+  pull_request:
+    paths:
+      - 'front/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'front/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: front
+        run: npm ci
+      
+      - name: Run tests
+        working-directory: front
+        run: npm test -- --run
+      
+      - name: Generate coverage report
+        working-directory: front
+        run: npm run test:coverage
+        continue-on-error: true
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./front/coverage/coverage-final.json
+          flags: frontend
+          name: codecov-umbrella
+        continue-on-error: true
+      
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Tests du service front exécutés avec succès!\n\n📊 Consultez le rapport de couverture et les détails en cliquant sur "Details".'
+            })
+        continue-on-error: true

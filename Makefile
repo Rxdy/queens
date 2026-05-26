@@ -1,4 +1,4 @@
-.PHONY: up down build run stop logs clean services status check-docker help dev-front dev-backend dev-both dev-ide test-e2e test-e2e-debug test-e2e-ui test-e2e-all test-images test-components test-integration ide-view
+.PHONY: up down build run stop logs clean services status check-docker help dev-front dev-backend dev-both dev-ide test-e2e test-e2e-debug test-e2e-ui test-e2e-all test-images test-components test-integration test-unit-front test-unit-front-watch test-unit-front-coverage test-unit-front-ui ide-view
 
 # Vérifier que Docker et Docker Compose sont disponibles
 check-docker:
@@ -92,6 +92,18 @@ test-components:
 test-integration:
 	cd front && npx playwright test integration.spec.js --headed
 
+test-unit-front:
+	cd front && npm test -- --run
+
+test-unit-front-watch:
+	cd front && npm test -- --watch
+
+test-unit-front-coverage:
+	cd front && npm run test:coverage
+
+test-unit-front-ui:
+	cd front && npm run test:ui
+
 ide-view:
 	@echo "🌐 Ouverture de l'app dans VS Code..."
 	code --open-url http://localhost:5173
@@ -128,7 +140,13 @@ help:
 	@echo "  make dev-both - Lancer backend + frontend"
 	@echo "  make dev-ide - Lancer frontend et ouvrir dans VS Code"
 	@echo ""
-	@echo "🧪 TESTS PLAYWRIGHT (E2E, composants, intégration) :"
+	@echo "🧪 TESTS UNITAIRES VUE (composants) :"
+	@echo "  make test-unit-front - Lancer tous les tests unitaires"
+	@echo "  make test-unit-front-watch - Lancer en mode watch (surveillance)"
+	@echo "  make test-unit-front-ui - UI interactive pour les tests (🎯)"
+	@echo "  make test-unit-front-coverage - Générer un rapport de couverture"
+	@echo ""
+	@echo "🧪 TESTS PLAYWRIGHT (E2E, composants, intégration) :
 	@echo "  make test-e2e - Lancer tous les tests en mode headed"
 	@echo "  make test-e2e-debug - Lancer les tests en mode debug"
 	@echo "  make test-e2e-ui - Lancer les tests dans l'IDE Playwright (🎯)"
