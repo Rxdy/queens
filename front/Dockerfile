@@ -3,7 +3,8 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# Supprimer le lockfile x86 pour forcer npm à résoudre les modules natifs ARM64
+RUN rm -f package-lock.json && npm install
 
 COPY . .
 RUN npm run build
