@@ -431,7 +431,7 @@ const uploadImportImage = async () => {
         formData.append("file", importFile.value);
 
         const response = await axios.post(
-            "http://localhost:8000/api/extract-matrix",
+            `${import.meta.env.VITE_TRM_API_BASE}/api/extract-matrix`,
             formData,
             {
                 headers: {
@@ -710,8 +710,8 @@ const submit = async () => {
 
     // Lancer les deux modèles en parallèle
     const [trmRes, baselineRes] = await Promise.allSettled([
-        axios.post("http://localhost:8000/api/solve", payload),
-        axios.post("http://localhost:8001/api/solve", payload),
+        axios.post(`${import.meta.env.VITE_TRM_API_BASE}/api/solve`, payload),
+        axios.post(`${import.meta.env.VITE_BASELINE_API_BASE}/api/solve`, payload),
     ]);
 
     // Traitement TRM
@@ -1051,8 +1051,8 @@ const benchmarkAllSizes = async () => {
         
         // Lancer les deux modèles en parallèle
         const [trmRes, baselineRes] = await Promise.allSettled([
-            axios.post("http://localhost:8000/api/solve", payload),
-            axios.post("http://localhost:8001/api/solve", payload),
+            axios.post(`${import.meta.env.VITE_TRM_API_BASE}/api/solve`, payload),
+            axios.post(`${import.meta.env.VITE_BASELINE_API_BASE}/api/solve`, payload),
         ]);
         
         // Extraire les solutions du TRM

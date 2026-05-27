@@ -1,0 +1,35 @@
+services:
+
+  # ── Frontend buildé + Nginx (seul port exposé sur l'hôte) ──────────────────
+  nginx:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - trm-solveur
+      - baseline-solveur
+    restart: unless-stopped
+
+  # ── Backend TRM (accessible uniquement en interne via Docker network) ───────
+  trm-solveur:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./TRM:/app
+    command: >
+      sh -c "pip install --quiet -r requirements.txt &&
+             uvicorn app:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+
+  # ── Backend Baseline ────────────────────────────────────────────────────────
+  baseline-solveur:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./baseline-8queens:/app
+    command: >
+      sh -c "pip install --quiet -r requirements.txt &&
+             uvicorn app:app --host 0.0.0.0 --port 8001"
+    restart: unless-stopped
