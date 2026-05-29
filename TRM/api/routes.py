@@ -1,8 +1,11 @@
 """
 Routes API pour TRM Solver
 """
+import asyncio
+from functools import partial
 from fastapi import APIRouter, HTTPException, UploadFile, File
 import logging
+import json
 import time
 import os
 from pathlib import Path
@@ -51,9 +54,12 @@ async def solve(grid: GridInput):
                     detail=f"La ligne {i} doit avoir {grid.size} colonnes, reçu {len(row)}"
                 )
         
-        # Résolution
+        # Résolution (dans un thread pour ne pas bloquer l'event loop)
+        loop = asyncio.get_event_loop()
         start_time = time.time()
-        solutions, iterations = solver.solve(grid.size, grid.zones)
+        solutions, iterations = await loop.run_in_executor(
+            None, partial(solver.solve, grid.size, grid.zones)
+        )
         end_time = time.time()
         
         execution_time = end_time - start_time
@@ -126,6 +132,22 @@ async def extract_matrix(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"❌ Erreur lors de l'extraction: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors du traitement de l'image: {str(e)}")
+
+
+@router.get("/stats")
+async def get_stats():
+    """
+    Retourne les statistiques pré-calculées sur 10 000 résolutions par taille de grille.
+    Données issues de generate_dataset.py (TRM + Baseline).
+    """
+    summary_path = Path(__file__).parent.parent.parent / "data" / "summary.json"
+    if not summary_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Fichier summary.json introuvable. Lancez generate_dataset.py d'abord."
+        )
+    with open(summary_path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 @router.get("/health")

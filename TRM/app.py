@@ -162,4 +162,10 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=HOST, port=PORT, reload=True)
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        timeout_keep_alive=0,  # Pas de timeout pour keep-alive
+        timeout_graceful_shutdown=None,  # Pas de timeout pour shutdown
+    )

@@ -15,20 +15,27 @@ class QueensGreedyBaseline:
     def __init__(self, seed: int = 42):
         random.seed(seed)
 
-    def solve_exhaustive(self, n: int, zones: list) -> tuple:
+    def solve_exhaustive(self, n: int, zones: list, max_iterations: int = 10**18) -> tuple:
         """
-        Backtracking naïf exhaustif : trouve TOUTES les solutions avec contrainte de zones.
-        Identique au TRM en termes de résultat, mais sans ses optimisations.
+        Backtracking naïf exhaustif : compte TOUTES les solutions sans les stocker en RAM.
+        Seule la première solution est gardée pour l'affichage.
         Zone constraint : une seule reine par zone (couleur).
         """
-        all_solutions = []
         placement = [-1] * n
         used_cols = [False] * n
         used_zones = set()
+        iteration_count = [0]
+        solution_count = [0]
+        first_solution = [None]
 
         def backtrack(row: int):
+            iteration_count[0] += 1
+            if iteration_count[0] > max_iterations:
+                return
             if row == n:
-                all_solutions.append([[i, placement[i]] for i in range(n)])
+                solution_count[0] += 1
+                if first_solution[0] is None:
+                    first_solution[0] = [[i, placement[i]] for i in range(n)]
                 return
             for col in range(n):
                 if used_cols[col]:
@@ -37,15 +44,8 @@ class QueensGreedyBaseline:
                 zone = zones[row][col] if zones and row < len(zones) and col < len(zones[row]) else -1
                 if zone != -1 and zone in used_zones:
                     continue
-                # Contrainte d'adjacence (même règle que TRM) : pas de reines dans les 8 cases adjacentes
-                valid = True
-                for prev_row in range(row):
-                    dr = abs(placement[prev_row] - col)
-                    dc = abs(prev_row - row)
-                    if max(dr, dc) == 1:
-                        valid = False
-                        break
-                if not valid:
+                # Contrainte d'adjacence : uniquement avec la ligne précédente (optimisation O(1))
+                if placement[row - 1] != -1 and abs(placement[row - 1] - col) <= 1:
                     continue
                 # Placer la reine
                 placement[row] = col
@@ -61,8 +61,8 @@ class QueensGreedyBaseline:
                     used_zones.discard(zone)
 
         backtrack(0)
-        first_solution = all_solutions[0] if all_solutions else []
-        return all_solutions, first_solution, len(all_solutions)
+        sol = first_solution[0] if first_solution[0] is not None else []
+        return sol, solution_count[0]
     
     def count_conflicts(self, placement: List[int]) -> int:
         """Compte le nombre de conflits (attaques) dans un placement."""

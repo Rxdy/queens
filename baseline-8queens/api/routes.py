@@ -1,8 +1,10 @@
 """
 Routes API pour Baseline Solver (heuristique greedy + local search)
 """
+import asyncio
 import time
 from fastapi import APIRouter
+from functools import partial
 
 from api.models import GridInput, BaselineSolution, BaselinePerformance
 from src.greedy_model import QueensGreedyBaseline
@@ -23,8 +25,11 @@ async def solve(grid: GridInput):
     zones = grid.zones
 
     try:
+        loop = asyncio.get_event_loop()
         start = time.perf_counter()
-        all_solutions, first_solution, count = _model.solve_exhaustive(size, zones)
+        first_solution, count = await loop.run_in_executor(
+            None, partial(_model.solve_exhaustive, size, zones)
+        )
         elapsed = time.perf_counter() - start
 
         valid = count > 0
@@ -32,7 +37,7 @@ async def solve(grid: GridInput):
         return BaselineSolution(
             supported=True,
             solution=first_solution,
-            solutions=all_solutions,
+            solutions=[first_solution] if first_solution else [],
             performance=BaselinePerformance(
                 execution_time=elapsed,
                 valid=valid,

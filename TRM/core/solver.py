@@ -12,12 +12,12 @@ class QueensSolver:
     Classe pour résoudre le problème des N-Reines avec contraintes de zones
     """
     
-    def __init__(self, max_iterations: int = 10_000_000):
+    def __init__(self, max_iterations: int = 10**18):
         """
         Initialise le solveur
         
         Args:
-            max_iterations: Nombre maximum d'itérations autorisées
+            max_iterations: Nombre maximum d'itérations autorisées (par défaut 10^18 - pratiquement illimité)
         """
         self.max_iterations = max_iterations
         self.iterations = 0
