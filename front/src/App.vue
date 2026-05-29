@@ -1,6 +1,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import axios from "axios";
+import BenchmarkChart from "./BenchmarkChart.vue";
+
+// Configuration axios sans timeout pour permettre les requêtes long-running
+axios.defaults.timeout = 0; // 0 = pas de timeout
+
+const currentView = ref("game");
 
 const size = ref(8);
 const zones = ref([]);
@@ -63,8 +69,8 @@ const colors = [
     "rgb(150, 190, 255)",
     "rgb(255, 201, 146)",
     "rgb(187, 163, 226)",
-    "rgb(240, 240, 240)", // Gris très clair pour la couleur par défaut
-    "rgb(139, 69, 19)", // Marron pour remplacer le beige
+    "rgb(240, 240, 240)",
+    "rgb(139, 69, 19)",
     "rgb(255, 123, 96)",
     "rgb(230, 243, 136)",
     "rgb(179, 223, 160)",
@@ -708,15 +714,15 @@ const submit = async () => {
     trmPerformance.value = null;
     baselineResult.value = null;
 
-    // Lancer les deux modèles en parallèle
-    const [trmRes, baselineRes] = await Promise.allSettled([
-        axios.post("http://localhost:8000/api/solve", payload),
-        axios.post("http://localhost:8001/api/solve", payload),
-    ]);
+    // Lancer TRM et Baseline indépendamment (ne pas attendre le baseline pour afficher)
+    const trmPromise = axios.post("http://localhost:8000/api/solve", payload);
+    const baselinePromise = axios.post("http://localhost:8001/api/solve", payload);
 
-    // Traitement TRM
-    if (trmRes.status === "fulfilled") {
-        const data = trmRes.value.data;
+    // Afficher le résultat TRM dès qu'il arrive
+    let historyEntry = null;
+    try {
+        const trmRes = await trmPromise;
+        const data = trmRes.data;
         solutions.value = data.solutions;
         trmPerformance.value = data.performance;
 
@@ -728,40 +734,37 @@ const submit = async () => {
             errorMessage.value = "";
             currentSolutionIndex.value = 0;
             positions.value = solutions.value[0];
-            
-            // Préparer les temps du baseline si disponibles
-            let baselineTime = null;
-            let baselineValid = false;
-            let baselineSolutionsCount = 0;
-            if (baselineRes.status === "fulfilled") {
-                baselineTime = baselineRes.value.data?.performance?.execution_time ?? null;
-                baselineValid = baselineRes.value.data?.performance?.valid ?? false;
-                baselineSolutionsCount = baselineRes.value.data?.performance?.solutions_count ?? 0;
-            }
-            
-            history.value.unshift({
+
+            historyEntry = {
                 grid: zones.value.map((row) => [...row]),
                 solutions: solutions.value.map((sol) => [...sol]),
                 timestamp: new Date().toLocaleString("fr-FR"),
                 size: size.value,
                 trmTime: trmPerformance.value?.execution_time,
-                baselineTime,
-                baselineValid,
-                baselineSolutionsCount,
-            });
+                baselineTime: null,
+                baselineValid: false,
+                baselineSolutionsCount: 0,
+            };
+            history.value.unshift(historyEntry);
         }
-    } else {
-        console.error(trmRes.reason);
+    } catch (err) {
+        console.error(err);
         positions.value = [];
         solutions.value = [];
         errorMessage.value =
             "Erreur lors de la résolution. Vérifiez que le serveur backend fonctionne.";
     }
 
-    // Traitement Baseline
-    if (baselineRes.status === "fulfilled") {
-        baselineResult.value = baselineRes.value.data;
-    }
+    // Mettre à jour avec le baseline quand il répond (sans bloquer l'UI)
+    baselinePromise.then((baselineRes) => {
+        baselineResult.value = baselineRes.data;
+        const perf = baselineRes.data?.performance;
+        if (historyEntry && perf) {
+            historyEntry.baselineTime = perf.execution_time ?? null;
+            historyEntry.baselineValid = perf.valid ?? false;
+            historyEntry.baselineSolutionsCount = perf.solutions_count ?? 0;
+        }
+    }).catch(() => { /* baseline optionnel */ });
 };
 
 // Vérifier si la grille est complètement remplie et utilise le bon nombre de couleurs
@@ -871,6 +874,19 @@ const resetGrid = () => {
     isPainting.value = false;
     trmPerformance.value = null;
     baselineResult.value = null;
+};
+
+const generateRandomPattern = () => {
+    if (isViewingHistory.value) return;
+    zones.value = generateRandomConnectedPattern(size.value);
+    positions.value = [];
+    solutions.value = [];
+    errorMessage.value = "";
+    currentSolutionIndex.value = 0;
+    selectedHistoryIndex.value = -1;
+    trmPerformance.value = null;
+    baselineResult.value = null;
+    isPainting.value = false;
 };
 
 const loadSolution = (index) => {
@@ -1218,6 +1234,22 @@ if (drafts.value.length === 0) {
 <template>
     <div class="app">
         <h1 class="title">Queens Game Solveur</h1>
+        <nav class="view-tabs">
+            <button
+                class="view-tab"
+                :class="{ active: currentView === 'game' }"
+                @click="currentView = 'game'"
+            >
+                <i class="ri-grid-line" aria-hidden="true"></i> Jeu
+            </button>
+            <button
+                class="view-tab"
+                :class="{ active: currentView === 'stats' }"
+                @click="currentView = 'stats'"
+            >
+                <i class="ri-bar-chart-grouped-line" aria-hidden="true"></i> Statistiques
+            </button>
+        </nav>
         <div v-if="showWelcomeModal || showHelpModal" class="modal-overlay" @click.self="closeCurrentModal">
             <div class="modal-window welcome-window">
                 <h3>{{ showWelcomeModal ? 'Bienvenue dans le solveur' : 'Aide' }}</h3>
@@ -1239,7 +1271,15 @@ if (drafts.value.length === 0) {
                     </p>
                 </div>
                 <div class="welcome-section">
-                    <h4>2. Boutons principaux</h4>
+                    <h4>2. Historique</h4>
+                    <p>
+                        Chaque grille résolue est sauvegardée dans l'<strong>historique</strong> de votre session.
+                        L'historique affiche le nombre de solutions trouvées et les temps d'exécution du TRM et du baseline.
+                        Cliquez sur une entrée de l'historique pour visualiser les solutions d'une grille antérieure.
+                    </p>
+                </div>
+                <div class="welcome-section">
+                    <h4>3. Boutons principaux</h4>
                     <div class="welcome-buttons">
                         <div class="welcome-action">
                             <button class="guide-btn new-icon-btn" disabled>
@@ -1266,11 +1306,19 @@ if (drafts.value.length === 0) {
                             </div>
                         </div>
                         <div class="welcome-action">
+                            <button class="guide-btn random-icon-btn" disabled>
+                                <i class="ri-shuffle-line"></i>
+                            </button>
+                            <div>
+                                <strong>Schéma aléatoire</strong><br />Remplit automatiquement la grille avec un motif de zones aléatoire selon la taille sélectionnée.
+                            </div>
+                        </div>
+                        <div class="welcome-action">
                             <button class="guide-btn benchmark-icon-btn" disabled>
                                 <i class="ri-bar-chart-line"></i>
                             </button>
                             <div>
-                                <strong>Benchmark aléatoire</strong><br />Test du solveur sur plusieurs tailles variées de manière aléatoire.
+                                <strong>Benchmark aléatoire</strong><br />Lance plusieurs résolutions aléatoires pour comparer TRM et Baseline.
                             </div>
                         </div>
                         <div class="welcome-action">
@@ -1308,15 +1356,18 @@ if (drafts.value.length === 0) {
                     </div>
                 </div>
                 <div class="welcome-section">
-                    <h4>3. Historique</h4>
+                    <h4>4. Statistiques</h4>
                     <p>
-                        Chaque grille résolue est sauvegardée dans l'<strong>historique</strong> de votre session.
-                        L'historique affiche le nombre de solutions trouvées et les temps d'exécution du TRM et du baseline.
-                        Cliquez sur une entrée de l'historique pour visualiser les solutions d'une grille antérieure.
+                        L'onglet <strong>Statistiques</strong> affiche un graphique de performance pour la session actuelle.
+                        Vous y voyez les temps moyens de TRM et de Baseline par taille de grille, présentés sur une échelle logarithmique.
                     </p>
+                    <ul>
+                        <li>Le graphique agrège uniquement les résolutions de la session en cours.</li>
+                        <li>Les petites valeurs en microsecondes et les grandes valeurs en secondes sont affichées proportionnellement.</li>
+                    </ul>
                 </div>
                 <div class="welcome-section">
-                    <h4>4. Système d'import</h4>
+                    <h4>5. Système d'import</h4>
                     <p>
                         Deux modes sont disponibles : <strong>Matrice</strong> et <strong>Image</strong>.
                     </p>
@@ -1333,7 +1384,7 @@ if (drafts.value.length === 0) {
                     </ul>
                 </div>
                 <div class="welcome-section">
-                    <h4>5. Brouillons</h4>
+                    <h4>6. Brouillons</h4>
                     <p>
                         Chaque nouvelle grille crée un brouillon enregistré en bas de l'écran.
                         Vous pouvez basculer entre plusieurs brouillons comme des onglets,
@@ -1359,7 +1410,8 @@ if (drafts.value.length === 0) {
                 </div>
             </div>
         </div>
-        <div class="main-layout" :class="{ 'history-hidden': !historyVisible }">
+        <BenchmarkChart v-if="currentView === 'stats'" :history="history" />
+        <div v-if="currentView === 'game'" class="main-layout" :class="{ 'history-hidden': !historyVisible }">
             <div v-if="historyVisible" class="history-panel">
                 <h3>Historique</h3>
                 <div v-if="history.length === 0" class="no-history">
@@ -1421,10 +1473,18 @@ if (drafts.value.length === 0) {
                             <i class="ri-refresh-line" aria-hidden="true"></i>
                         </button>
                         <button
+                            @click="generateRandomPattern"
+                            :disabled="isViewingHistory"
+                            class="icon-btn random-icon-btn"
+                            title="Remplir aléatoirement la grille"
+                        >
+                            <i class="ri-shuffle-line" aria-hidden="true"></i>
+                        </button>
+                        <button
                             @click="benchmarkAllSizes"
                             class="icon-btn benchmark-icon-btn"
                             :disabled="isBenchmarking"
-                            title="Benchmark 4-12"
+                            title="Benchmark 1 grille/taille (4→12)"
                         >
                             <i class="ri-bar-chart-line" aria-hidden="true"></i>
                         </button>
@@ -1458,6 +1518,9 @@ if (drafts.value.length === 0) {
                             <i class="ri-question-line" aria-hidden="true"></i>
                         </button>
                     </div>
+                    <div v-if="benchmarkStatus" class="benchmark-status header-status">
+                        {{ benchmarkStatus }}
+                    </div>
                     <button
                         v-if="windowWidth < 600"
                         @click="toggleHistory"
@@ -1466,9 +1529,6 @@ if (drafts.value.length === 0) {
                         {{ historyVisible ? "Masquer" : "Afficher" }}
                         l'historique
                     </button>
-                    <div v-if="benchmarkStatus" class="benchmark-status header-status">
-                        {{ benchmarkStatus }}
-                    </div>
                 </div>
                 <div
                     class="grid"
@@ -1610,7 +1670,7 @@ if (drafts.value.length === 0) {
         </div>
         
         <!-- Onglets de brouillons - FIXE en bas -->
-        <div v-if="drafts.length > 0" class="drafts-panel">
+        <div v-if="currentView !== 'stats' && drafts.length > 0" class="drafts-panel">
             <div class="drafts-tabs">
                 <div
                     v-for="(draft, index) in drafts"
@@ -1618,18 +1678,14 @@ if (drafts.value.length === 0) {
                     class="draft-tab"
                     :class="{ active: currentDraftIndex === index }"
                     @click="switchDraft(index)"
+                    :title="draft.updatedAt"
                 >
-                    <div class="draft-info">
-                        <span class="draft-size">{{ draft.size }}×{{ draft.size }}</span>
-                        <span class="draft-time">{{ draft.updatedAt }}</span>
-                    </div>
+                    <span class="draft-size">{{ draft.size }}×{{ draft.size }}</span>
                     <button
                         @click.stop="deleteDraft(index)"
                         class="draft-delete-btn"
                         title="Supprimer ce brouillon"
-                    >
-                        ×
-                    </button>
+                    >×</button>
                 </div>
             </div>
         </div>
@@ -1793,33 +1849,74 @@ if (drafts.value.length === 0) {
 }
 
 html,
-body {
-    width: 100vw;
-    min-height: 100vh;
+body,
+#app {
+    width: 100%;
+    height: 100vh;
     margin: 0;
     padding: 0;
-    overflow: auto;
+    overflow: hidden;
 }
 </style>
 
 <style scoped>
 .app {
     width: 100vw;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1vh 1vw;
+    padding: 0;
+    margin: 0;
     background-color: #f5f5f5;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .title {
     text-align: center;
-    margin-bottom: 1vh;
+    margin-bottom: 0.5vh;
+    margin-top: 0.5vh;
     color: #333;
     font-size: 2rem;
     font-weight: bold;
+    flex-shrink: 0;
+}
+
+.view-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1vh;
+    background: #e8e8e8;
+    padding: 4px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.view-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 18px;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: #666;
+    transition: background 0.15s, color 0.15s;
+}
+
+.view-tab:hover {
+    background: rgba(255, 255, 255, 0.7);
+    color: #333;
+}
+
+.view-tab.active {
+    background: #fff;
+    color: #333;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 .main-layout {
@@ -1828,11 +1925,13 @@ body {
     justify-content: center;
     align-items: flex-start;
     gap: 2vw;
-    width: 98vw;
-    height: auto;
+    width: 100%;
+    padding: 1vh 1vw;
     flex: 1;
+    min-height: 0;
     max-width: 1400px;
-    overflow: auto;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .main-layout.history-hidden {
@@ -1899,9 +1998,10 @@ body {
     }
 
     .main-layout {
-        width: 99vw;
+        width: 100%;
         gap: 1vw;
-        height: 90vh;
+        height: auto;
+        max-height: none;
     }
 
     .palette {
@@ -2160,89 +2260,82 @@ body {
 }
 
 .drafts-panel {
-    width: 98vw;
-    max-width: 1400px;
-    padding: 1vh 1.5vw;
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    border-top: 2px solid #e0e0e0;
+    width: 100vw;
+    max-width: none;
+    padding: 3px 8px 0;
+    background-color: #f0f0f0;
+    border-top: 1px solid #ccc;
     flex-shrink: 0;
-    margin-top: 1vh;
+    margin-top: 0;
     overflow: visible;
+    box-sizing: border-box;
 }
 
 .drafts-tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: 2px;
     overflow-x: auto;
-    padding-bottom: 0.5rem;
+    align-items: flex-end;
+    scrollbar-width: thin;
 }
 
 .draft-tab {
     flex-shrink: 0;
-    padding: 0.8rem 1rem;
-    background-color: #fff;
-    border: 2px solid #ddd;
-    border-radius: 6px;
+    padding: 3px 8px 3px 10px;
+    background-color: #e0e0e0;
+    border: 1px solid #bbb;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    min-width: 120px;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: #555;
+    line-height: 1;
+    height: 26px;
 }
 
 .draft-tab:hover {
-    border-color: #999;
-    background-color: #f9f9f9;
+    background-color: #f0f0f0;
+    color: #222;
 }
 
 .draft-tab.active {
-    background-color: #e3f2fd;
-    border-color: #2196f3;
-    color: #1976d2;
+    background-color: #fff;
+    border-color: #aaa;
+    color: #111;
     font-weight: 600;
-}
-
-.draft-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    flex: 1;
-    min-width: 0;
+    height: 28px;
 }
 
 .draft-size {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.draft-time {
-    font-size: 0.75rem;
-    color: #666;
+    font-weight: inherit;
+    font-size: inherit;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .draft-delete-btn {
-    background-color: transparent;
+    background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.5rem;
+    font-size: 0.85rem;
     color: #999;
     padding: 0;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 14px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    border-radius: 2px;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
 }
 
 .draft-delete-btn:hover {
     color: #d32f2f;
+    background: rgba(211,47,47,0.1);
 }
 
 .reset-btn {
@@ -2445,13 +2538,19 @@ body {
     justify-content: center;
     border-radius: 50%;
     border: none;
-    color: #fff;
+    color: #111;
     cursor: default;
     opacity: 1;
 }
 
 .welcome-action .guide-btn i {
     font-size: 1.1rem;
+    color: inherit;
+}
+
+.welcome-action .guide-btn.benchmark-icon-btn,
+.welcome-action .guide-btn.import-icon-btn {
+    color: #fff;
 }
 
 .welcome-actions {
@@ -2823,10 +2922,9 @@ body {
 .palette {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(6, 1fr);
-    gap: 12px;
+    gap: 10px;
     width: 100%;
-    padding: 20px;
+    padding: 16px;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 12px;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -2949,9 +3047,13 @@ body {
     padding: 0;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    max-height: 600px;
+    max-height: calc(100vh - 6rem);
     overflow-y: auto;
     border: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    align-self: start;
 }
 
 .history-panel h3 {
