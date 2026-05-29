@@ -1856,6 +1856,7 @@ body,
     margin: 0;
     padding: 0;
     overflow: hidden;
+    font-family: Arial, sans-serif;
 }
 </style>
 
@@ -2537,10 +2538,13 @@ body,
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    border: none;
-    color: #111;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: #fff;
+    color: #333;
     cursor: default;
     opacity: 1;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .welcome-action .guide-btn i {
@@ -2549,8 +2553,42 @@ body,
 }
 
 .welcome-action .guide-btn.benchmark-icon-btn,
-.welcome-action .guide-btn.import-icon-btn {
-    color: #fff;
+.welcome-action .guide-btn.benchmark-icon-btn:disabled {
+    background-color: #1565c0 !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 6px rgba(21, 101, 192, 0.3) !important;
+}
+
+.welcome-action .guide-btn.import-icon-btn,
+.welcome-action .guide-btn.import-icon-btn:disabled {
+    background-color: #9c27b0 !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 6px rgba(156, 39, 176, 0.3) !important;
+}
+
+.guide-btn:disabled {
+    opacity: 1;
+    background: #fff;
+    color: #333;
+}
+
+.welcome-action .guide-btn.random-icon-btn,
+.welcome-action .guide-btn.random-icon-btn:disabled {
+    background-color: #fff;
+    color: #111;
+}
+
+.welcome-action .guide-btn.benchmark-icon-btn:disabled,
+.welcome-action .guide-btn.import-icon-btn:disabled,
+.welcome-action .guide-btn.copy-icon-btn:disabled,
+.welcome-action .guide-btn.download-icon-btn:disabled,
+.welcome-action .guide-btn.help-icon-btn:disabled,
+.welcome-action .guide-btn.new-icon-btn:disabled,
+.welcome-action .guide-btn.solve-icon-btn:disabled,
+.welcome-action .guide-btn.reset-icon-btn:disabled {
+    background: inherit;
 }
 
 .welcome-actions {
