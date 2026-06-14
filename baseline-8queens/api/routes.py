@@ -25,7 +25,7 @@ async def solve(grid: GridInput):
     zones = grid.zones
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         start = time.perf_counter()
         first_solution, count = await loop.run_in_executor(
             None, partial(_model.solve_exhaustive, size, zones)

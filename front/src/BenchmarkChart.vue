@@ -1,21 +1,12 @@
 <script setup>
 import { computed, ref } from "vue";
+import { formatMs } from "./utils/format.js";
 
 const props = defineProps({
   history: { type: Array, default: () => [] },
 });
 
 const avg = (arr) => arr.reduce((s, v) => s + v, 0) / arr.length;
-
-const stripTrailingZeros = (value) => String(value).replace(/\.0+$/, "");
-
-const formatMs = (ms) => {
-  if (ms === null || ms === undefined) return "—";
-  if (ms < 0.001) return `${(ms * 1_000_000).toFixed(0)} ns`;
-  if (ms < 1)     return `${(ms * 1000).toFixed(0)} µs`;
-  if (ms < 1000)  return `${stripTrailingZeros(ms.toFixed(1))} ms`;
-  return `${stripTrailingZeros((ms / 1000).toFixed(2))} s`;
-};
 
 const chartData = computed(() => {
   const bySize = {};

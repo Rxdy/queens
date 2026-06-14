@@ -7,7 +7,7 @@ from typing import List, Optional
 
 class GridInput(BaseModel):
     size: int = Field(..., description="Taille de la grille (size x size)", ge=1)
-    zones: List[List[int]] = Field(..., description="Grille des zones (non utilisée par le baseline)")
+    zones: List[List[int]] = Field(..., description="Grille des zones (matrice size x size)")
 
 
 class BaselinePerformance(BaseModel):

@@ -9,15 +9,25 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@vueuse/core": "^14.3.0",
     "axios": "^1.13.2",
     "vue": "^3.5.22"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@vitejs/plugin-vue": "^6.0.1",
-    "vite": "^7.1.11"
+    "@vitest/coverage-v8": "^4.1.8",
+    "@vue/test-utils": "^2.4.11",
+    "jsdom": "^29.1.1",
+    "vite": "^7.1.11",
+    "vitest": "^4.1.8"
   }
 }
