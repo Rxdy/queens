@@ -1,7 +1,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useLocalStorage } from "@vueuse/core";
 import axios from "axios";
 import BenchmarkChart from "./BenchmarkChart.vue";
+import { parseMatrixTextInput } from "./utils/parseMatrix.js";
+
+const TRM_BASE = import.meta.env.VITE_TRM_API_BASE ?? "";
+const BASELINE_BASE = import.meta.env.VITE_BASELINE_API_BASE ?? "";
 
 // Configuration axios sans timeout pour permettre les requêtes long-running
 axios.defaults.timeout = 0; // 0 = pas de timeout
@@ -38,31 +43,22 @@ const importPlaceholder = `Exemple :
 3 2 2 1
 3 3 3 1`;
 
-const isMobile = computed(() => windowWidth.value < 600);
+const isMobile = computed(() => screenWidth.value < 600);
 const currentSolutionIndex = ref(0);
 const isPainting = ref(false);
 const currentMouseButton = ref(null);
+const paintHistory = ref([]);
+const MAX_UNDO = 20;
 const selectedHistoryIndex = ref(-1);
 
-// Brouillons (drafts)
-const drafts = ref([]);
-const currentDraftIndex = ref(-1);
+// Brouillons (drafts) — persistés dans localStorage
+const drafts = useLocalStorage("queens-drafts", []);
+const currentDraftIndex = useLocalStorage("queens-draft-index", -1);
 const MAX_DRAFTS = 15;
 
 // Dimensions de l'écran réactives
 const screenWidth = ref(1200);
 const screenHeight = ref(800);
-
-// Debug: mesurer les vraies dimensions des cellules
-const gridDebugInfo = ref({
-    calculatedCellSize: 0,
-    actualCellSize: 0,
-    gridWidth: 0,
-    gridHeight: 0,
-    totalWidth: 0,
-    totalHeight: 0,
-    message: "",
-});
 
 const colors = [
     "rgb(223, 160, 191)",
@@ -95,11 +91,6 @@ const availableColorIndices = computed(() => {
         // On a atteint la limite, seules les couleurs utilisées restent disponibles
         return Array.from(usedColorsInGrid).sort((a, b) => a - b);
     }
-});
-
-// Couleurs disponibles selon la taille de la grille et l'état actuel
-const availableColors = computed(() => {
-    return availableColorIndices.value.map(index => colors[index]);
 });
 
 const importLegendItems = computed(() => {
@@ -160,7 +151,6 @@ const importMatrixParseResult = computed(() => {
     } else if (previewRows.some((row) => row.length === 0)) {
         error = "La matrice contient une ligne vide.";
     } else {
-        const size = previewRows.length;
         const widths = previewRows.map((row) => row.length);
         const rowCount = previewRows.length;
         const colCount = widths[0] || 0;
@@ -233,6 +223,7 @@ const initializeZones = () => {
     baselineResult.value = null;
     errorMessage.value = "";
     isPainting.value = false;
+    paintHistory.value = [];
     if (selectedColor.value >= size.value) {
         selectedColor.value = 0;
     }
@@ -336,10 +327,27 @@ const clickCell = (row, col, button) => {
     baselineResult.value = null;
 };
 
+const snapshotPaintState = () => {
+    paintHistory.value.push(zones.value.map((row) => [...row]));
+    if (paintHistory.value.length > MAX_UNDO) paintHistory.value.shift();
+};
+
+const undoPaint = () => {
+    if (paintHistory.value.length === 0) return;
+    zones.value = paintHistory.value.pop();
+    positions.value = [];
+    solutions.value = [];
+    currentSolutionIndex.value = 0;
+    trmPerformance.value = null;
+    baselineResult.value = null;
+    errorMessage.value = "";
+};
+
 const onMouseDown = (row, col, event) => {
-    event.preventDefault(); // Prévenir le menu contextuel pour clique droit
+    event.preventDefault();
     currentMouseButton.value = event.button;
     isPainting.value = true;
+    snapshotPaintState();
     clickCell(row, col, event.button);
 };
 
@@ -389,16 +397,8 @@ const closeImportModal = () => {
     resetImportImageState();
 };
 
-const closeWelcomeModal = () => {
-    showWelcomeModal.value = false;
-};
-
 const openHelpModal = () => {
     showHelpModal.value = true;
-};
-
-const closeHelpModal = () => {
-    showHelpModal.value = false;
 };
 
 const closeCurrentModal = () => {
@@ -437,7 +437,7 @@ const uploadImportImage = async () => {
         formData.append("file", importFile.value);
 
         const response = await axios.post(
-            "http://localhost:8000/api/extract-matrix",
+            `${TRM_BASE}/api/extract-matrix`,
             formData,
             {
                 headers: {
@@ -539,101 +539,7 @@ const downloadGridAsImage = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        // Aussi enregistrer dans le dossier test_images/ via API
-        canvas.toBlob((testBlob) => {
-            const formData = new FormData();
-            formData.append('file', testBlob, `test_${gridSize}x${gridSize}.png`);
-            fetch('/api/save-test-image', {
-                method: 'POST',
-                body: formData
-            }).catch(() => {
-                // Silencieusement ignorer si l'endpoint n'existe pas
-            });
-        });
     });
-};
-
-const parseMatrixTextInput = (text) => {
-    const lines = text
-        .split(/\r?\n/)
-        .map((row) => row.trim())
-        .filter((row) => row.length > 0);
-
-    if (lines.length === 0) {
-        throw new Error("La matrice est vide.");
-    }
-
-    const matrix = lines.map((line, rowIndex) => {
-        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
-        if (tokens.length === 0) {
-            throw new Error(`La ligne ${rowIndex + 1} est vide.`);
-        }
-
-        return tokens.map((token) => {
-            if (!/^[-]?\d+$/.test(token)) {
-                throw new Error(`Valeur invalide : '${token}'. Utilisez uniquement des entiers.`);
-            }
-            const value = Number(token);
-            if (value < -1) {
-                throw new Error(`Les valeurs doivent être supérieures ou égales à -1. Valeur trouvée : ${value}.`);
-            }
-            return value;
-        });
-    });
-
-    const size = matrix.length;
-    if (!matrix.every((row) => row.length === size)) {
-        throw new Error("La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.");
-    }
-    if (size < 4) {
-        throw new Error("La matrice doit être d'au moins 4×4.");
-    }
-
-    const allValues = matrix.flat();
-    const uniqueValues = [...new Set(allValues.filter((v) => v !== -1))];
-    if (uniqueValues.length > size) {
-        throw new Error("La matrice contient plus de zones distinctes que la taille de la grille.");
-    }
-
-    const maxValue = uniqueValues.length > 0 ? Math.max(...uniqueValues) : -1;
-    if (maxValue >= colors.length) {
-        throw new Error(`Les identifiants de zone doivent être inférieurs à ${colors.length}.`);
-    }
-
-    const valueMap = new Map(uniqueValues.map((value, index) => [value, index]));
-    const normalized = matrix.map((row) =>
-        row.map((value) => (value === -1 ? -1 : valueMap.get(value)))
-    );
-
-    return normalized;
-};
-
-const parseMatrixTextInputPreview = (text) => {
-    const lines = text
-        .split(/\r?\n/)
-        .map((row) => row.trim())
-        .filter((row) => row.length > 0);
-
-    if (lines.length === 0) {
-        return null;
-    }
-
-    const matrix = lines.map((line) => {
-        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
-        return tokens.map((token) => {
-            if (!/^[-]?\d+$/.test(token)) {
-                return null;
-            }
-            const value = Number(token);
-            return value;
-        });
-    });
-
-    const maxCols = Math.max(...matrix.map((row) => row.length));
-    return matrix.map((row) => [
-        ...row,
-        ...Array(Math.max(0, maxCols - row.length)).fill(-1),
-    ]);
 };
 
 const applyImportedMatrix = async () => {
@@ -659,7 +565,7 @@ const applyImportedMatrix = async () => {
     }
 
     try {
-        const matrix = parseMatrixTextInput(importMatrixText.value);
+        const matrix = parseMatrixTextInput(importMatrixText.value, colors.length);
         size.value = matrix.length;
         zones.value = matrix;
         positions.value = [];
@@ -715,8 +621,8 @@ const submit = async () => {
     baselineResult.value = null;
 
     // Lancer TRM et Baseline indépendamment (ne pas attendre le baseline pour afficher)
-    const trmPromise = axios.post("http://localhost:8000/api/solve", payload);
-    const baselinePromise = axios.post("http://localhost:8001/api/solve", payload);
+    const trmPromise = axios.post(`${TRM_BASE}/api/solve`, payload);
+    const baselinePromise = axios.post(`${BASELINE_BASE}/api/solve`, payload);
 
     // Afficher le résultat TRM dès qu'il arrive
     let historyEntry = null;
@@ -792,6 +698,30 @@ const hasGridData = computed(() => {
 });
 
 const isViewingHistory = computed(() => selectedHistoryIndex.value !== -1);
+
+const emptyCellsCount = computed(() => {
+    if (!zones.value) return 0;
+    return zones.value.flat().filter((cell) => cell === -1).length;
+});
+
+const onTouchStart = (row, col, event) => {
+    event.preventDefault();
+    currentMouseButton.value = 0;
+    isPainting.value = true;
+    snapshotPaintState();
+    clickCell(row, col, 0);
+};
+
+const onTouchMove = (event) => {
+    event.preventDefault();
+    if (!isPainting.value) return;
+    const touch = event.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!el) return;
+    const cell = el.closest("[data-row]");
+    if (!cell) return;
+    clickCell(parseInt(cell.dataset.row), parseInt(cell.dataset.col), currentMouseButton.value ?? 0);
+};
 
 const getCellStyle = (row, col) => {
     // Garde contre les grilles non initialisées
@@ -1067,8 +997,8 @@ const benchmarkAllSizes = async () => {
         
         // Lancer les deux modèles en parallèle
         const [trmRes, baselineRes] = await Promise.allSettled([
-            axios.post("http://localhost:8000/api/solve", payload),
-            axios.post("http://localhost:8001/api/solve", payload),
+            axios.post(`${TRM_BASE}/api/solve`, payload),
+            axios.post(`${BASELINE_BASE}/api/solve`, payload),
         ]);
         
         // Extraire les solutions du TRM
@@ -1096,8 +1026,6 @@ const benchmarkAllSizes = async () => {
             });
         }
         
-        // Petit délai pour éviter de surcharger les serveurs
-        await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     benchmarkStatus.value = `Benchmark terminé! ${successCount}/${benchmarkSizes.length} tests réussis`;
@@ -1111,14 +1039,11 @@ const toggleHistory = () => {
     historyVisible.value = !historyVisible.value;
 };
 
-const windowWidth = computed(() => screenWidth.value);
-const windowHeight = computed(() => screenHeight.value);
-
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
     // Espace disponible pour la grille (environ 70% de la largeur et 60% de la hauteur)
-    const availableWidth = windowWidth.value * 0.7;
-    const availableHeight = windowHeight.value * 0.6;
+    const availableWidth = screenWidth.value * 0.7;
+    const availableHeight = screenHeight.value * 0.6;
 
     // Calculer l'espace nécessaire pour les bordures
     // Bordure extérieure de la grille: 3px * 2 = 6px (avec box-sizing: border-box, c'est déjà inclus)
@@ -1147,55 +1072,57 @@ const updateScreenSize = () => {
     }
 };
 
-// Fonction pour mesurer les vraies dimensions des cellules du DOM
-const measureGridCells = () => {
-    setTimeout(() => {
-        const gridEl = document.querySelector(".grid");
-        if (!gridEl) return;
-        
-        const gridRect = gridEl.getBoundingClientRect();
-        const firstCell = gridEl.querySelector(".cell");
-        
-        if (firstCell) {
-            const cellRect = firstCell.getBoundingClientRect();
-            const actualCellSize = cellRect.width;
-            const diff = cellSize.value - actualCellSize;
-            
-            gridDebugInfo.value = {
-                calculatedCellSize: cellSize.value,
-                actualCellSize: Math.round(actualCellSize * 100) / 100,
-                gridWidth: Math.round(gridRect.width),
-                gridHeight: Math.round(gridRect.height),
-                totalWidth: Math.round(gridRect.width),
-                totalHeight: Math.round(gridRect.height),
-                message: diff > 2 ? "WARNING: cells smaller than calculated!" : "OK",
-            };
-            
-            console.log("Grid Debug:", gridDebugInfo.value);
-        }
-    }, 10);
-};
+const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+        if (isImportModalOpen.value) { closeImportModal(); return; }
+        if (showHelpModal.value || showWelcomeModal.value) { closeCurrentModal(); return; }
+    }
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
 
-// Watcher pour mesurer les cellules quand la taille change
-watch(() => [size.value, cellSize.value], () => {
-    measureGridCells();
-});
+    switch (event.key) {
+        case "Enter":
+        case " ":
+            if (isGridComplete.value && !isViewingHistory.value) {
+                event.preventDefault();
+                submit();
+            }
+            break;
+        case "ArrowRight":
+            if (solutions.value.length > 1) {
+                event.preventDefault();
+                loadSolution((currentSolutionIndex.value + 1) % solutions.value.length);
+            }
+            break;
+        case "ArrowLeft":
+            if (solutions.value.length > 1) {
+                event.preventDefault();
+                loadSolution((currentSolutionIndex.value - 1 + solutions.value.length) % solutions.value.length);
+            }
+            break;
+        case "z":
+        case "Z":
+            if (event.ctrlKey || event.metaKey) {
+                event.preventDefault();
+                undoPaint();
+            }
+            break;
+    }
+};
 
 // Lifecycle hooks pour gérer les event listeners
 onMounted(() => {
     updateScreenSize();
     window.addEventListener("resize", updateScreenSize);
-    // Ajouter un listener global pour mouseup pour éviter que isPainting reste bloqué
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("mouseleave", onMouseUp);
-    // Mesurer les cellules au montage
-    measureGridCells();
+    window.addEventListener("keydown", handleKeyDown);
 });
 
 onUnmounted(() => {
     window.removeEventListener("resize", updateScreenSize);
     window.removeEventListener("mouseup", onMouseUp);
     window.removeEventListener("mouseleave", onMouseUp);
+    window.removeEventListener("keydown", handleKeyDown);
 });
 
 // Masquer l'historique par défaut sur mobile
@@ -1229,6 +1156,23 @@ initializeHistoryVisibility();
 if (drafts.value.length === 0) {
     createNewDraft();
 }
+
+defineExpose({
+    zones,
+    size,
+    paintHistory,
+    selectedColor,
+    importMatrixText,
+    isGridComplete,
+    emptyCellsCount,
+    drafts,
+    currentDraftIndex,
+    errorMessage,
+    solutions,
+    initializeZones,
+    undoPaint,
+    snapshotPaintState,
+});
 </script>
 
 <template>
@@ -1261,11 +1205,13 @@ if (drafts.value.length === 0) {
                     <h4>1. Colorier la grille</h4>
                     <p>
                         Choisissez une couleur dans la palette à droite, puis utilisez les cliques pour remplir la grille :
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li><strong>Clique gauche</strong> : peint la case avec la couleur sélectionnée</li>
-                            <li><strong>Clique droit</strong> : efface la case</li>
-                            <li><strong>Rester enfoncé et glisser</strong> : continue l'action sur plusieurs cases</li>
-                        </ul>
+                    </p>
+                    <ul style="margin: 8px 0; padding-left: 20px;">
+                        <li><strong>Clique gauche</strong> : peint la case avec la couleur sélectionnée</li>
+                        <li><strong>Clique droit</strong> : efface la case</li>
+                        <li><strong>Rester enfoncé et glisser</strong> : continue l'action sur plusieurs cases</li>
+                    </ul>
+                    <p>
                         Chaque couleur représente une zone. Le sélecteur <strong>Taille</strong> permet de définir
                         la taille de la grille avant de commencer.
                     </p>
@@ -1356,7 +1302,16 @@ if (drafts.value.length === 0) {
                     </div>
                 </div>
                 <div class="welcome-section">
-                    <h4>4. Statistiques</h4>
+                    <h4>4. Raccourcis clavier</h4>
+                    <ul>
+                        <li><kbd>Entrée</kbd> ou <kbd>Espace</kbd> — Résoudre (quand la grille est complète)</li>
+                        <li><kbd>←</kbd> / <kbd>→</kbd> — Naviguer entre les solutions</li>
+                        <li><kbd>Ctrl+Z</kbd> — Annuler le dernier coup de pinceau</li>
+                        <li><kbd>Échap</kbd> — Fermer le modal actif</li>
+                    </ul>
+                </div>
+                <div class="welcome-section">
+                    <h4>5. Statistiques</h4>
                     <p>
                         L'onglet <strong>Statistiques</strong> affiche un graphique de performance pour la session actuelle.
                         Vous y voyez les temps moyens de TRM et de Baseline par taille de grille, présentés sur une échelle logarithmique.
@@ -1402,6 +1357,58 @@ if (drafts.value.length === 0) {
                             les plus anciens sont supprimés au-delà de ce nombre.
                         </li>
                     </ul>
+                </div>
+                <div class="welcome-section">
+                    <h4>7. Modèles</h4>
+                    <p>
+                        Un <strong>modèle</strong> désigne ici un algorithme de résolution : une stratégie logique
+                        que le programme applique pour trouver les placements valides des reines sur la grille.
+                        Ce n'est pas un modèle d'intelligence artificielle entraîné, mais un <em>solveur algorithmique</em>
+                        — une suite d'instructions qui explore les possibilités et déduit la solution par raisonnement.
+                        L'application compare deux modèles à chaque résolution pour vous montrer leurs différences de performance.
+                    </p>
+                    <div class="model-cards">
+                        <div class="model-card">
+                            <div class="model-card-header model-trm">
+                                <span class="model-badge">TRM</span>
+                                <strong>Tiny Recursive Model</strong>
+                            </div>
+                            <p>
+                                Le TRM est un solveur par <strong>backtracking récursif optimisé</strong> avec plusieurs techniques avancées.
+                                Il utilise des <em>bitsets</em> pour des opérations de domaine en O(1), une <strong>vérification d'adjacence en O(1)</strong>
+                                (comparaison avec la ligne précédente uniquement), et du <em>forward-checking</em> pour anticiper les impasses.
+                                Il explore un espace de recherche drastiquement réduit.
+                            </p>
+                            <ul>
+                                <li>Bitsets (opérations bit-à-bit) pour les colonnes et zones libres</li>
+                                <li>Vérification d'adjacence O(1) : uniquement avec la ligne précédente</li>
+                                <li>Forward-checking multi-lignes : atteignabilité des zones libres</li>
+                                <li>Typiquement <strong>×1.5 à ×2 plus rapide</strong> que le baseline</li>
+                            </ul>
+                        </div>
+                        <div class="model-card">
+                            <div class="model-card-header model-baseline">
+                                <span class="model-badge">Baseline</span>
+                                <strong>Backtracking naïf exhaustif</strong>
+                            </div>
+                            <p>
+                                Le Baseline est un solveur par <strong>backtracking exhaustif sans optimisation</strong>.
+                                Il utilise une <strong>vérification d'adjacence en O(n)</strong> (boucle sur toutes les lignes précédentes)
+                                et n'emploie aucune technique de pruning ou d'anticipation. Il explore activement un arbre complet
+                                avant de découvrir les contradictions.
+                            </p>
+                            <ul>
+                                <li>Vérification d'adjacence O(n) : boucle sur toutes les reines placées</li>
+                                <li>Aucune optimisation, aucun forward-checking</li>
+                                <li>Trouve toutes les solutions comme le TRM, mais explore davantage d'états</li>
+                                <li>Sert de référence pour mesurer le gain des optimisations du TRM</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 0.85em; color: var(--text-secondary, #888);">
+                        Les deux modèles produisent exactement les mêmes solutions — la différence réside dans le nombre d'états
+                        explorés et donc la <em>vitesse d'exécution</em>. Le TRM explore typiquement 20 à 50 % d'états en moins.
+                    </p>
                 </div>
                 <div class="welcome-actions">
                     <button class="solve-btn" type="button" @click="closeCurrentModal">
@@ -1460,7 +1467,7 @@ if (drafts.value.length === 0) {
                             @click="submit"
                             :disabled="!isGridComplete || isViewingHistory"
                             class="icon-btn solve-icon-btn"
-                            title="Résoudre"
+                            :title="isGridComplete ? 'Résoudre' : `${emptyCellsCount} case${emptyCellsCount > 1 ? 's' : ''} vide${emptyCellsCount > 1 ? 's' : ''}`"
                         >
                             <i class="ri-check-line" aria-hidden="true"></i>
                         </button>
@@ -1522,7 +1529,7 @@ if (drafts.value.length === 0) {
                         {{ benchmarkStatus }}
                     </div>
                     <button
-                        v-if="windowWidth < 600"
+                        v-if="screenWidth < 600"
                         @click="toggleHistory"
                         class="toggle-history-btn"
                     >
@@ -1538,6 +1545,8 @@ if (drafts.value.length === 0) {
                         height: `${cellSize * size + 10}px`,
                     }"
                     @mouseup="onMouseUp"
+                    @touchmove.prevent="onTouchMove"
+                    @touchend="onMouseUp"
                 >
                     <div
                         v-for="(row, r) in zones"
@@ -1545,13 +1554,16 @@ if (drafts.value.length === 0) {
                         style="display: contents"
                     >
                         <div
-                            v-for="(cell, c) in row"
+                            v-for="(_, c) in row"
                             :key="c"
                             class="cell"
+                            :data-row="r"
+                            :data-col="c"
                             :style="getCellStyle(r, c)"
                             @mousedown="onMouseDown(r, c, $event)"
                             @mouseenter="onMouseEnter(r, c)"
                             @mouseup="onMouseUp"
+                            @touchstart.prevent="onTouchStart(r, c, $event)"
                             @contextmenu.prevent
                         >
                             <svg
@@ -1582,7 +1594,7 @@ if (drafts.value.length === 0) {
                     </p>
                     <div v-if="solutions.length > 1" class="solution-buttons">
                         <button
-                            v-for="(sol, idx) in solutions.slice(0, 5)"
+                            v-for="(_, idx) in solutions.slice(0, 5)"
                             :key="idx"
                             @click="loadSolution(idx)"
                             class="solution-btn"
@@ -1658,7 +1670,7 @@ if (drafts.value.length === 0) {
                 </div>
                 <div class="palette">
                     <div
-                        v-for="(colorIndex, visibleIndex) in availableColorIndices"
+                        v-for="colorIndex in availableColorIndices"
                         :key="colorIndex"
                         class="color-btn"
                         :class="{ selected: selectedColor === colorIndex }"
@@ -1933,10 +1945,6 @@ body,
     max-width: 1400px;
     overflow-y: auto;
     box-sizing: border-box;
-}
-
-.main-layout.history-hidden {
-    grid-template-columns: 0 1fr 20vw;
 }
 
 .main-layout.history-hidden {
@@ -2512,6 +2520,73 @@ body,
     margin-bottom: 0.7rem;
 }
 
+.model-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 0.8rem;
+}
+
+.model-card {
+    border: 1px solid #e3e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fbfbff;
+}
+
+.model-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.95rem;
+}
+
+.model-trm {
+    background: linear-gradient(90deg, #e8f0fe 0%, #f0f4ff 100%);
+    border-bottom: 1px solid #c5d5f8;
+}
+
+.model-baseline {
+    background: linear-gradient(90deg, #fef3e8 0%, #fff8f0 100%);
+    border-bottom: 1px solid #f8d5a0;
+}
+
+.model-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    background: rgba(0,0,0,0.08);
+    color: #333;
+}
+
+.model-card p,
+.model-card ul {
+    padding: 0.7rem 1rem;
+    margin: 0;
+    font-size: 0.9rem;
+    color: #444;
+    line-height: 1.5;
+}
+
+.model-card ul {
+    padding-top: 0;
+    padding-left: 2rem;
+}
+
+.model-card li {
+    margin-bottom: 0.3rem;
+}
+
+@media (max-width: 540px) {
+    .model-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
 .welcome-buttons {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2599,6 +2674,18 @@ body,
 
 .welcome-actions .solve-btn {
     padding: 0.95rem 1.5rem;
+}
+
+.welcome-window kbd {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #1f2937;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    padding: 0.1rem 0.45rem;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 0.82em;
 }
 
 .welcome-window code {

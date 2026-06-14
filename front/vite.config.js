@@ -13,4 +13,20 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ['vue'],
+          vueuse: ['@vueuse/core'],
+        },
+      },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/__tests__/setup.js'],
+    include: ['src/**/*.spec.js'],
+  },
 })
