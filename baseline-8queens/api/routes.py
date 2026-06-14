@@ -3,10 +3,11 @@ Routes API pour Baseline Solver (heuristique greedy + local search)
 """
 import asyncio
 import time
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from functools import partial
 
 from api.models import GridInput, BaselineSolution, BaselinePerformance
+from api.limiter import limiter
 from src.greedy_model import QueensGreedyBaseline
 
 router = APIRouter()
@@ -16,7 +17,8 @@ _model = QueensGreedyBaseline()
 
 
 @router.post("/solve", response_model=BaselineSolution)
-async def solve(grid: GridInput):
+@limiter.limit("30/minute")
+async def solve(request: Request, grid: GridInput):
     """
     Résout les N-Reines par backtracking naïf exhaustif (sans optimisations).
     Trouve TOUTES les solutions comme le TRM, pour une comparaison équitable.

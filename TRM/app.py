@@ -11,10 +11,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.routes import router as api_router
+from api.limiter import limiter
 from utils.logger import setup_logging
-from core.config import HOST, PORT, LOG_LEVEL
+from core.config import HOST, PORT, LOG_LEVEL, CORS_ORIGINS
 
 logger = setup_logging(LOG_LEVEL)
 
@@ -34,11 +37,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(api_router, prefix="/api", tags=["solver"])
