@@ -94,6 +94,19 @@ Affiche l'état de chaque service avec son URL et son statut.
 
 ---
 
+## 📚 Documentation
+
+La documentation complète est dans le dossier [documentation/](documentation/README.md), organisée en deux axes :
+
+| Section | Contenu |
+|---------|---------|
+| [documentation/technique/](documentation/technique/README.md) | Explication des algorithmes, routes, composants, fonctions utilitaires |
+| [documentation/utilisateurs/](documentation/utilisateurs/README.md) | Description des endpoints API (avec exemples cURL) + fonctionnalités de l'interface |
+
+Chaque fichier est relié par une navigation `← Précédent / Suivant →`.
+
+---
+
 ## 🛠️ Commandes Make disponibles
 
 ```bash

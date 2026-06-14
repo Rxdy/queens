@@ -1,22 +1,29 @@
 """
 Baseline Queens Solver API - Modèle heuristique léger (sans PyTorch)
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from api.routes import router
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+
 app = FastAPI(
     title="Baseline Queens Solver API",
     description="Modèle heuristique (greedy + local search) pour la résolution des N-Reines",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -131,4 +138,15 @@ async def root():
           </body>
         </html>
         """
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8001,
+        timeout_keep_alive=0,
+        timeout_graceful_shutdown=None,
     )

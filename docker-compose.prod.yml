@@ -8,9 +8,17 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - trm-solveur
-      - baseline-solveur
+      trm-solveur:
+        condition: service_healthy
+      baseline-solveur:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── Backend TRM (accessible uniquement en interne via Docker network) ───────
   trm-solveur:
@@ -22,6 +30,12 @@ services:
       sh -c "pip install --quiet -r requirements.txt &&
              uvicorn app:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   # ── Backend Baseline ────────────────────────────────────────────────────────
   baseline-solveur:
@@ -33,3 +47,9 @@ services:
       sh -c "pip install --quiet -r requirements.txt &&
              uvicorn app:app --host 0.0.0.0 --port 8001"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

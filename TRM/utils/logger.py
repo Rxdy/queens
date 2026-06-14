@@ -18,13 +18,16 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
     # Configuration du format des logs
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    # Configuration du handler
+    logger = logging.getLogger("trm_solver")
+
+    if logger.hasHandlers():
+        return logger
+
+    logger.propagate = False
+    logger.setLevel(getattr(logging, log_level.upper()))
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(log_format))
-    
-    # Configuration du logger
-    logger = logging.getLogger("trm_solver")
-    logger.setLevel(getattr(logging, log_level.upper()))
     logger.addHandler(handler)
-    
+
     return logger

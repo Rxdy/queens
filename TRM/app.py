@@ -7,6 +7,7 @@ Architecture Clean:
 - utils/ : Utilitaires (logging, helpers)
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -15,29 +16,34 @@ from api.routes import router as api_router
 from utils.logger import setup_logging
 from core.config import HOST, PORT, LOG_LEVEL
 
-# Configuration du logging
 logger = setup_logging(LOG_LEVEL)
 
-# Création de l'application FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 TRM Solver démarré")
+    logger.info(f"📡 Écoute sur {HOST}:{PORT}")
+    yield
+    logger.info("🛑 TRM Solver arrêté")
+
+
 app = FastAPI(
     title="TRM Solver API",
     description="Tiny Recursive Model pour résoudre le problème des N-Reines avec contraintes de zones",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan,
 )
 
-# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En développement, permettre toutes les origines
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Inclusion des routes API
 app.include_router(api_router, prefix="/api", tags=["solver"])
 
-# Page d'accueil HTML à la racine
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     return HTMLResponse(
@@ -148,18 +154,13 @@ async def root():
         """
     )
 
-@app.on_event("startup")
-async def startup_event():
-    """Événement de démarrage de l'application"""
-    logger.info("🚀 TRM Solver démarré")
-    logger.info(f"📡 Écoute sur {HOST}:{PORT}")
-    logger.info("� Architecture modulaire activée")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Événement d'arrêt de l'application"""
-    logger.info("🛑 TRM Solver arrêté")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=HOST, port=PORT, reload=True)
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        timeout_keep_alive=0,
+        timeout_graceful_shutdown=None,
+    )
