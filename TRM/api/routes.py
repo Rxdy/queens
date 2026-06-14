@@ -3,11 +3,12 @@ Routes API pour TRM Solver
 """
 import asyncio
 from functools import partial
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 import logging
 import time
 
 from api.models import GridInput, Solution, PerformanceMetrics, ExtractedMatrix
+from api.limiter import limiter
 from core.solver import QueensSolver
 from core.config import MAX_ITERATIONS
 from utils.image_processor import extract_matrix_from_image
@@ -19,7 +20,8 @@ solver = QueensSolver(max_iterations=MAX_ITERATIONS)
 
 
 @router.post("/solve", response_model=Solution)
-async def solve(grid: GridInput):
+@limiter.limit("30/minute")
+async def solve(request: Request, grid: GridInput):
     """
     Résout le problème des N-Reines avec contraintes de zones
 

@@ -19,7 +19,8 @@ const positions = ref([]);
 const solutions = ref([]);
 const selectedColor = ref(0);
 const errorMessage = ref("");
-const history = ref([]);
+const MAX_HISTORY = 100;
+const history = useLocalStorage("queens-history", []);
 const historyVisible = ref(true);
 const trmPerformance = ref(null);
 const baselineResult = ref(null);
@@ -652,6 +653,7 @@ const submit = async () => {
                 baselineSolutionsCount: 0,
             };
             history.value.unshift(historyEntry);
+            if (history.value.length > MAX_HISTORY) history.value.splice(MAX_HISTORY);
         }
     } catch (err) {
         console.error(err);
@@ -1024,6 +1026,7 @@ const benchmarkAllSizes = async () => {
                 baselineValid: baselineRes.status === "fulfilled" ? baselineRes.value.data.performance.valid : false,
                 baselineSolutionsCount: baselineRes.status === "fulfilled" ? baselineRes.value.data.performance.solutions_count : 0,
             });
+            if (history.value.length > MAX_HISTORY) history.value.splice(MAX_HISTORY);
         }
         
     }
@@ -1455,11 +1458,12 @@ defineExpose({
             </div>
             <div class="grid-container">
                 <div class="grid-header">
-                    <div class="grid-toolbar">
+                    <div class="grid-toolbar" role="toolbar" aria-label="Actions sur la grille">
                         <button
                             @click="clearForNewGrid"
                             class="icon-btn new-icon-btn"
                             title="Nouvelle grille"
+                            aria-label="Nouvelle grille"
                         >
                             <i class="ri-add-line" aria-hidden="true"></i>
                         </button>
@@ -1468,6 +1472,7 @@ defineExpose({
                             :disabled="!isGridComplete || isViewingHistory"
                             class="icon-btn solve-icon-btn"
                             :title="isGridComplete ? 'Résoudre' : `${emptyCellsCount} case${emptyCellsCount > 1 ? 's' : ''} vide${emptyCellsCount > 1 ? 's' : ''}`"
+                            :aria-label="isGridComplete ? 'Résoudre' : `${emptyCellsCount} case${emptyCellsCount > 1 ? 's' : ''} vide${emptyCellsCount > 1 ? 's' : ''}`"
                         >
                             <i class="ri-check-line" aria-hidden="true"></i>
                         </button>
@@ -1476,6 +1481,7 @@ defineExpose({
                             :disabled="!hasGridData || isViewingHistory"
                             class="icon-btn reset-icon-btn"
                             title="Réinitialiser la grille"
+                            aria-label="Réinitialiser la grille"
                         >
                             <i class="ri-refresh-line" aria-hidden="true"></i>
                         </button>
@@ -1484,6 +1490,7 @@ defineExpose({
                             :disabled="isViewingHistory"
                             class="icon-btn random-icon-btn"
                             title="Remplir aléatoirement la grille"
+                            aria-label="Remplir aléatoirement la grille"
                         >
                             <i class="ri-shuffle-line" aria-hidden="true"></i>
                         </button>
@@ -1492,6 +1499,7 @@ defineExpose({
                             class="icon-btn benchmark-icon-btn"
                             :disabled="isBenchmarking"
                             title="Benchmark 1 grille/taille (4→12)"
+                            aria-label="Benchmark 1 grille/taille (4→12)"
                         >
                             <i class="ri-bar-chart-line" aria-hidden="true"></i>
                         </button>
@@ -1500,6 +1508,7 @@ defineExpose({
                             class="icon-btn import-icon-btn"
                             :disabled="isViewingHistory"
                             title="Importer une image"
+                            aria-label="Importer une image"
                         >
                             <i class="ri-upload-cloud-line" aria-hidden="true"></i>
                         </button>
@@ -1507,6 +1516,7 @@ defineExpose({
                             @click="copyMatrixToClipboard"
                             class="icon-btn copy-icon-btn"
                             title="Copier la matrice"
+                            aria-label="Copier la matrice"
                         >
                             <i class="ri-file-copy-line" aria-hidden="true"></i>
                         </button>
@@ -1514,6 +1524,7 @@ defineExpose({
                             @click="downloadGridAsImage"
                             class="icon-btn download-icon-btn"
                             title="Télécharger la grille en image"
+                            aria-label="Télécharger la grille en image"
                         >
                             <i class="ri-download-line" aria-hidden="true"></i>
                         </button>
@@ -1521,6 +1532,7 @@ defineExpose({
                             @click="openHelpModal"
                             class="icon-btn help-icon-btn"
                             title="Afficher l'aide"
+                            aria-label="Afficher l'aide"
                         >
                             <i class="ri-question-line" aria-hidden="true"></i>
                         </button>
