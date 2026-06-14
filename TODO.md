@@ -93,3 +93,26 @@
 - [x] HTML valide : `<ul>` extrait du `<p>` dans le modal d'aide (App.vue)
 - [x] `.gitignore` : `front/test-results/` et `front/playwright-report/` ajoutés
 - [x] Commit final : 69 fichiers, tout versioned
+
+---
+
+## 💡 Propositions d'amélioration (à valider)
+
+### CI/CD
+- [ ] **GitHub Actions** : pipeline qui lance automatiquement `vitest run` + `pytest TRM` + `pytest baseline` à chaque push — aucun test ne passe inaperçu
+
+### Qualité de code
+- [ ] **ESLint + Prettier** (frontend) : linter Vue/JS pour détecter les erreurs et homogénéiser le style — aucun linter configuré actuellement
+- [ ] **Ruff** (Python) : linter/formatter ultra-rapide pour les deux backends — remplace flake8 + isort + black en un seul outil
+- [ ] **Couverture de tests** : configurer des seuils minimaux dans Vitest (`coverage.thresholds`) pour bloquer si la couverture descend sous ~80 %
+- [ ] **README.md** : supprimer la ligne orpheline ligne 195 ("Génère 6 images de test…") qui traîne sans contexte depuis la suppression de `generate_test_images.py`
+
+### Sécurité / robustesse
+- [ ] **Rate limiting API** : ajouter `slowapi` sur les endpoints `/api/solve` pour éviter les abus (ex. 10 req/min par IP) — utile si le Pi est exposé publiquement via Cloudflare
+- [ ] **CORS restrictif en prod** : remplacer `allow_origins=["*"]` par l'URL exacte du frontend en production
+
+### Accessibilité
+- [ ] **Aria labels** sur les boutons icônes (Résoudre, Nouvelle grille, etc.) — actuellement ils ont un `title` mais pas d'`aria-label`, ce qui nuit aux lecteurs d'écran
+
+### Fonctionnalités
+- [ ] **Persistance des benchmarks** : les résultats de benchmark sont perdus au rechargement — les stocker en `localStorage` comme les brouillons
