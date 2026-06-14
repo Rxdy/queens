@@ -7,7 +7,7 @@ check-docker:
 		echo "❌ Docker n'est pas installé ou pas dans le PATH"; \
 		exit 1; \
 	fi
-	@if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then \
+	@if ! command -v docker compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then \
 		echo "❌ Docker Compose n'est pas installé ou pas dans le PATH"; \
 		exit 1; \
 	fi
@@ -18,22 +18,22 @@ up: check-docker
 	docker compose up
 
 down:
-	docker-compose down
+	docker compose down
 
 build: check-docker
-	docker-compose build
+	docker compose build
 
 run: check-docker
-	docker-compose up -d
+	docker compose up -d
 
 stop:
-	docker-compose stop
+	docker compose stop
 
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 clean:
-	docker-compose down -v
+	docker compose down -v
 	docker system prune -f
 
 # État des services
