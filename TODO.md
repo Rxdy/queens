@@ -72,8 +72,8 @@
 - [x] `front/tests/error-handling.spec.js` — 5 tests : erreur réseau, 500, 0 solutions, grille incomplète désactive Résoudre, titre bouton avec nb cases vides
 
 ### Infrastructure
-- [ ] `docker-compose.yml` (dev) : ajouter `healthcheck` sur les 3 services (optionnel)
-- [ ] `docker-compose.prod.yml` : ajouter `healthcheck` sur nginx + backends (optionnel)
+- [x] `docker-compose.yml` (dev) : healthcheck sur les 3 services (`/api/health`, interval 30s, start_period 60s)
+- [x] `docker-compose.prod.yml` : healthcheck nginx + backends, `depends_on: condition: service_healthy`
 
 ### Documentation
 - [x] `documentation/` : architecture complète (technique + utilisateurs × 3 services)
@@ -84,4 +84,12 @@
   - [x] `documentation/utilisateurs/trm/` — endpoints TRM avec exemples cURL
   - [x] `documentation/utilisateurs/baseline/` — endpoints Baseline
   - [x] `documentation/utilisateurs/frontend/` — grille, brouillons, import, benchmark, raccourcis (5 fichiers)
-- [ ] `README.md` (racine) : mettre à jour pour pointer vers `documentation/`
+- [x] `README.md` (racine) : section Documentation ajoutée avec tableau pointant vers `documentation/`
+
+---
+
+## ✅ Qualité de code (bonus)
+- [x] Pydantic v2 : `class Config` → `model_config = ConfigDict()` dans les 3 modèles TRM (0 warnings)
+- [x] HTML valide : `<ul>` extrait du `<p>` dans le modal d'aide (App.vue)
+- [x] `.gitignore` : `front/test-results/` et `front/playwright-report/` ajoutés
+- [x] Commit final : 69 fichiers, tout versioned
