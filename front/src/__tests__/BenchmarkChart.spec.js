@@ -98,7 +98,7 @@ describe('BenchmarkChart', () => {
   describe('tooltip', () => {
     it('tooltip est invisible par défaut', () => {
       const wrapper = mount(BenchmarkChart, { props: { history: oneEntry } })
-      expect(wrapper.find('.tooltip-bg').exists()).toBe(false)
+      expect(wrapper.find('.tooltip-box').exists()).toBe(false)
     })
 
     it('tooltip apparaît au mouseenter sur une barre TRM', async () => {
@@ -107,7 +107,7 @@ describe('BenchmarkChart', () => {
         attachTo: document.body,
       })
       await wrapper.find('.trm-bar').trigger('mouseenter', { clientX: 200, clientY: 150 })
-      expect(wrapper.find('.tooltip-bg').exists()).toBe(true)
+      expect(wrapper.find('.tooltip-box').exists()).toBe(true)
       wrapper.unmount()
     })
 
@@ -119,7 +119,7 @@ describe('BenchmarkChart', () => {
       const bar = wrapper.find('.trm-bar')
       await bar.trigger('mouseenter', { clientX: 200, clientY: 150 })
       await bar.trigger('mouseleave')
-      expect(wrapper.find('.tooltip-bg').exists()).toBe(false)
+      expect(wrapper.find('.tooltip-box').exists()).toBe(false)
       wrapper.unmount()
     })
 
@@ -129,7 +129,7 @@ describe('BenchmarkChart', () => {
         attachTo: document.body,
       })
       await wrapper.find('.trm-bar').trigger('mouseenter', { clientX: 200, clientY: 150 })
-      const texts = wrapper.findAll('.tooltip-text').map(el => el.text())
+      const texts = wrapper.findAll('.tooltip-box div').map(el => el.text())
       expect(texts.some(t => t.includes('TRM'))).toBe(true)
       wrapper.unmount()
     })
@@ -140,7 +140,7 @@ describe('BenchmarkChart', () => {
         attachTo: document.body,
       })
       await wrapper.find('.baseline-bar').trigger('mouseenter', { clientX: 200, clientY: 150 })
-      const texts = wrapper.findAll('.tooltip-text').map(el => el.text())
+      const texts = wrapper.findAll('.tooltip-box div').map(el => el.text())
       expect(texts.some(t => t.includes('Baseline'))).toBe(true)
       wrapper.unmount()
     })
