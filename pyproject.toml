@@ -1,0 +1,25 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["TRM", "baseline-8queens"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in default arguments (FastAPI Depends)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["api", "core", "utils", "src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
