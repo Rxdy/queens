@@ -9,7 +9,7 @@ export default defineConfig({
     vue(),
   ],
   server: {
-    allowedHosts: 'all',
+    allowedHosts: true,
   },
   resolve: {
     alias: {
