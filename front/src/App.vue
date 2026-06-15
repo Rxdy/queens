@@ -3,7 +3,9 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useLocalStorage } from "@vueuse/core";
 import axios from "axios";
 import BenchmarkChart from "./BenchmarkChart.vue";
-import { parseMatrixTextInput } from "./utils/parseMatrix.js";
+import HelpWelcomeModal from "./components/HelpWelcomeModal.vue";
+import HistoryPanel from "./components/HistoryPanel.vue";
+import ImportModal from "./components/ImportModal.vue";
 
 const TRM_BASE = import.meta.env.VITE_TRM_API_BASE ?? "";
 const BASELINE_BASE = import.meta.env.VITE_BASELINE_API_BASE ?? "";
@@ -27,22 +29,9 @@ const baselineResult = ref(null);
 const isBenchmarking = ref(false);
 const benchmarkStatus = ref("");
 const isImportModalOpen = ref(false);
+const importModalRef = ref(null);
 const showWelcomeModal = ref(true);
 const showHelpModal = ref(false);
-const importMode = ref("text");
-const importMatrixText = ref("");
-const importError = ref("");
-const importFile = ref(null);
-const importImagePreviewUrl = ref("");
-const importImageResult = ref(null);
-const importImageExtractError = ref("");
-const importImageLoading = ref(false);
-const showImportLegend = ref(false);
-const importPlaceholder = `Exemple :
-0 0 1 1
-0 2 2 1
-3 2 2 1
-3 3 3 1`;
 
 const isMobile = computed(() => screenWidth.value < 600);
 const currentSolutionIndex = ref(0);
@@ -86,132 +75,11 @@ const availableColorIndices = computed(() => {
     const maxColors = size.value;
 
     if (usedColorsInGrid.size < maxColors) {
-        // On peut encore ajouter des couleurs, toutes sont disponibles
         return Array.from({ length: colors.length }, (_, i) => i);
     } else {
-        // On a atteint la limite, seules les couleurs utilisées restent disponibles
         return Array.from(usedColorsInGrid).sort((a, b) => a - b);
     }
 });
-
-const importLegendItems = computed(() => {
-    const items = Array.from({ length: colors.length }, (_, value) => ({
-        value,
-        color: colors[value],
-        label: `${value} = zone/couleur ${value + 1}`,
-        isEmpty: false,
-    }));
-    items.push({
-        value: -1,
-        color: "#fff",
-        label: "-1 = cellule vide",
-        isEmpty: true,
-    });
-    return items;
-});
-
-const importMatrixParseResult = computed(() => {
-    const lines = importMatrixText.value
-        .split(/\r?\n/)
-        .map((row) => row.trim())
-        .filter((row) => row.length > 0);
-
-    const previewRows = lines.map((line, rowIndex) => {
-        const tokens = line.split(/[\s,;]+/).filter((token) => token.length > 0);
-        return tokens.map((token) => {
-            const isInteger = /^-?\d+$/.test(token);
-            const value = isInteger ? Number(token) : null;
-            const valid = isInteger && value >= -1;
-            return {
-                raw: token,
-                value,
-                valid,
-                rowIndex,
-            };
-        });
-    });
-
-    const maxColumns = previewRows.reduce(
-        (max, row) => Math.max(max, row.length),
-        0
-    );
-    previewRows.forEach((row) => {
-        while (row.length < maxColumns) {
-            row.push({
-                raw: "-1",
-                value: -1,
-                valid: true,
-                rowIndex: row.rowIndex,
-            });
-        }
-    });
-
-    let error = null;
-    if (lines.length === 0) {
-        error = null;
-    } else if (previewRows.some((row) => row.length === 0)) {
-        error = "La matrice contient une ligne vide.";
-    } else {
-        const widths = previewRows.map((row) => row.length);
-        const rowCount = previewRows.length;
-        const colCount = widths[0] || 0;
-
-        if (!widths.every((width) => width === colCount)) {
-            error = "La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.";
-        } else if (rowCount !== colCount) {
-            error = "La matrice doit être carrée : le nombre de colonnes doit être égal au nombre de lignes.";
-        } else if (rowCount < 4) {
-            error = "La matrice doit être d'au moins 4×4.";
-        } else {
-            const parsedValues = previewRows.flatMap((row) =>
-                row.filter((cell) => cell.valid).map((cell) => cell.value)
-            );
-            const uniqueValues = [...new Set(parsedValues.filter((v) => v !== -1))];
-            if (uniqueValues.length > rowCount) {
-                error = "La matrice contient plus de zones distinctes que la taille de la grille.";
-            } else if (uniqueValues.some((v) => v >= colors.length)) {
-                error = `Les identifiants de zone doivent être inférieurs à ${colors.length}.`;
-            } else if (previewRows.some((row) => row.some((cell) => !cell.valid))) {
-                error = "La matrice contient des valeurs invalides. Utilisez uniquement des entiers >= -1.";
-            }
-        }
-    }
-
-    return {
-        previewRows,
-        isValid: error === null && previewRows.length > 0 && previewRows.every((row) => row.length > 0),
-        error,
-    };
-});
-
-const importPreviewMatrix = computed(() => importMatrixParseResult.value.previewRows);
-const importImageMatrixPreview = computed(() => {
-    if (!importImageResult.value?.zones) return null;
-    return importImageResult.value.zones.map((row) =>
-        row.map((cell) => ({
-            raw: cell === -1 ? "-1" : String(cell),
-            value: cell,
-            valid: true,
-        }))
-    );
-});
-const activeImportPreviewMatrix = computed(() =>
-    importMode.value === "text" ? importPreviewMatrix.value : importImageMatrixPreview.value
-);
-const importIsValid = computed(
-    () =>
-        importMode.value === "text"
-            ? importMatrixText.value.trim().length > 0 && importMatrixParseResult.value.isValid
-            : !!importImageResult.value?.zones
-);
-const importParseError = computed(
-    () =>
-        importMode.value === "text"
-            ? importMatrixText.value.trim().length > 0
-                ? importMatrixParseResult.value.error
-                : null
-            : importImageExtractError.value
-);
 
 const initializeZones = () => {
     zones.value = Array.from({ length: size.value }, () =>
@@ -244,7 +112,7 @@ const saveDraft = () => {
 
 const createNewDraft = () => {
     saveDraft();
-    
+
     const newDraft = {
         id: Date.now(),
         size: 8,
@@ -253,16 +121,14 @@ const createNewDraft = () => {
         createdAt: new Date().toLocaleString("fr-FR"),
         updatedAt: new Date().toLocaleString("fr-FR"),
     };
-    
+
     drafts.value.unshift(newDraft);
-    
-    // Limiter le nombre de brouillons à MAX_DRAFTS
-    // Si dépassement, supprimer les plus anciens
+
     if (drafts.value.length > MAX_DRAFTS) {
         const excess = drafts.value.length - MAX_DRAFTS;
         drafts.value.splice(-excess);
     }
-    
+
     currentDraftIndex.value = 0;
     size.value = newDraft.size;
     zones.value = newDraft.zones.map((row) => [...row]);
@@ -272,12 +138,12 @@ const createNewDraft = () => {
 
 const switchDraft = (index) => {
     if (index === currentDraftIndex.value) return;
-    
+
     saveDraft();
-    
+
     const draft = drafts.value[index];
     if (!draft) return;
-    
+
     currentDraftIndex.value = index;
     size.value = draft.size;
     zones.value = draft.zones.map((row) => [...row]);
@@ -310,20 +176,18 @@ const clearForNewGrid = () => {
 
 const clickCell = (row, col, button) => {
     if (isViewingHistory.value) return;
-    
+
     if (button === 0) {
-        // Clique gauche : peindre avec la couleur sélectionnée
         zones.value[row][col] = selectedColor.value;
     } else if (button === 2) {
-        // Clique droit : effacer la case
         zones.value[row][col] = -1;
     }
-    
-    errorMessage.value = ""; // Vider le message d'erreur lors de modification
-    positions.value = []; // Vider les positions des reines
-    solutions.value = []; // Vider les solutions
+
+    errorMessage.value = "";
+    positions.value = [];
+    solutions.value = [];
     currentSolutionIndex.value = 0;
-    selectedHistoryIndex.value = -1; // Désélectionner l'historique
+    selectedHistoryIndex.value = -1;
     trmPerformance.value = null;
     baselineResult.value = null;
 };
@@ -370,32 +234,14 @@ const formatTime = (seconds) => {
     return `${seconds.toFixed(3)} s`;
 };
 
-const resetImportImageState = () => {
-    if (importImagePreviewUrl.value) {
-        URL.revokeObjectURL(importImagePreviewUrl.value);
-    }
-    importFile.value = null;
-    importImagePreviewUrl.value = "";
-    importImageResult.value = null;
-    importImageExtractError.value = "";
-    importImageLoading.value = false;
-};
-
 const openImportModal = () => {
-    if (isViewingHistory.value) return; // Empêcher d'ouvrir si on visualise un historique
+    if (isViewingHistory.value) return;
     isImportModalOpen.value = true;
-    importMode.value = "text";
-    importMatrixText.value = "";
-    importError.value = "";
-    showImportLegend.value = false;
-    resetImportImageState();
+    importModalRef.value?.open();
 };
 
 const closeImportModal = () => {
     isImportModalOpen.value = false;
-    importError.value = "";
-    showImportLegend.value = false;
-    resetImportImageState();
 };
 
 const openHelpModal = () => {
@@ -408,56 +254,6 @@ const closeCurrentModal = () => {
     } else if (showHelpModal.value) {
         showHelpModal.value = false;
     }
-};
-
-const selectImportMode = (mode) => {
-    importMode.value = mode;
-    importError.value = "";
-    importImageExtractError.value = "";
-    if (mode === "photo") {
-        importMatrixText.value = "";
-    } else {
-        resetImportImageState();
-    }
-};
-
-const handleImportFileChange = (event) => {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-    resetImportImageState();
-    importFile.value = file;
-    importImagePreviewUrl.value = URL.createObjectURL(file);
-};
-
-const uploadImportImage = async () => {
-    if (!importFile.value) return;
-    importImageExtractError.value = "";
-    importImageLoading.value = true;
-    try {
-        const formData = new FormData();
-        formData.append("file", importFile.value);
-
-        const response = await axios.post(
-            `${TRM_BASE}/api/extract-matrix`,
-            formData,
-            {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            }
-        );
-
-        importImageResult.value = response.data;
-    } catch (err) {
-        importImageExtractError.value =
-            err?.response?.data?.detail || err.message || "Erreur lors de l'import de l'image.";
-    } finally {
-        importImageLoading.value = false;
-    }
-};
-
-const toggleImportLegend = () => {
-    showImportLegend.value = !showImportLegend.value;
 };
 
 const copyMatrixToClipboard = async () => {
@@ -488,7 +284,6 @@ const downloadGridAsImage = () => {
     const gridTotalSize = gridSize * cellSize + 2 * borderWidth;
     const canvasSize = gridTotalSize + 2 * margin;
 
-    // Créer un canvas
     const canvas = document.createElement("canvas");
     canvas.width = canvasSize;
     canvas.height = canvasSize;
@@ -496,29 +291,24 @@ const downloadGridAsImage = () => {
 
     if (!ctx) return;
 
-    // Fond blanc (incluant la marge)
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-    // Dessiner les cellules
     zones.value.forEach((row, r) => {
         row.forEach((cellColor, c) => {
             const x = margin + borderWidth + c * cellSize;
             const y = margin + borderWidth + r * cellSize;
 
-            // Remplir avec la couleur
             const color = cellColor === -1 ? "#fff" : colors[cellColor];
             ctx.fillStyle = color;
             ctx.fillRect(x, y, cellSize, cellSize);
 
-            // Bordure de la cellule (traits noirs)
             ctx.strokeStyle = "#000";
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, cellSize, cellSize);
         });
     });
 
-    // Bordure noire de 5px autour de la grille
     ctx.strokeStyle = "#000";
     ctx.lineWidth = borderWidth;
     ctx.strokeRect(
@@ -528,7 +318,6 @@ const downloadGridAsImage = () => {
         gridSize * cellSize
     );
 
-    // Télécharger l'image
     canvas.toBlob((blob) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
@@ -539,75 +328,43 @@ const downloadGridAsImage = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
     });
 };
 
-const applyImportedMatrix = async () => {
-    if (importMode.value === "photo") {
-        if (!importImageResult.value?.zones) {
-            importImageExtractError.value =
-                "Aucune matrice extraite. Importez une photo valide avant de valider.";
-            return;
-        }
-
-        const matrix = importImageResult.value.zones;
-        size.value = matrix.length;
-        zones.value = matrix;
-        positions.value = [];
-        solutions.value = [];
-        selectedHistoryIndex.value = -1;
-        trmPerformance.value = null;
-        baselineResult.value = null;
-        errorMessage.value = "";
-        selectedColor.value = 0;
-        isImportModalOpen.value = false;
-        return;
-    }
-
-    try {
-        const matrix = parseMatrixTextInput(importMatrixText.value, colors.length);
-        size.value = matrix.length;
-        zones.value = matrix;
-        positions.value = [];
-        solutions.value = [];
-        selectedHistoryIndex.value = -1;
-        trmPerformance.value = null;
-        baselineResult.value = null;
-        errorMessage.value = "";
-        selectedColor.value = 0;
-        isImportModalOpen.value = false;
-    } catch (err) {
-        importError.value = err instanceof Error ? err.message : "Format de matrice invalide.";
-    }
+const onMatrixApplied = (matrix) => {
+    size.value = matrix.length;
+    zones.value = matrix;
+    positions.value = [];
+    solutions.value = [];
+    selectedHistoryIndex.value = -1;
+    trmPerformance.value = null;
+    baselineResult.value = null;
+    errorMessage.value = "";
+    selectedColor.value = 0;
+    isImportModalOpen.value = false;
 };
 
 // speedup > 1 → TRM plus rapide, speedup < 1 → baseline plus rapide
-// Affiché comme "TRM est X× plus rapide" ou "Baseline est X× plus rapide"
 const speedup = computed(() => {
     const trmTime = trmPerformance.value?.execution_time;
     const baseTime = baselineResult.value?.performance?.execution_time;
     if (!trmTime || !baseTime || !baselineResult.value?.supported) return null;
-    // ratio = baseTime / trmTime : >1 signifie TRM plus rapide
     return (baseTime / trmTime).toFixed(1);
 });
 
 const submit = async () => {
-    // Créer un mapping des couleurs utilisées vers des identifiants de zones
     const usedColors = new Set(
         zones.value.flat().filter((cell) => cell !== -1)
     );
     const colorToZoneMap = new Map();
     let zoneId = 0;
 
-    // Trier les couleurs pour un mapping déterministe
     Array.from(usedColors)
         .sort((a, b) => a - b)
         .forEach((color) => {
             colorToZoneMap.set(color, zoneId++);
         });
 
-    // Transformer la grille en utilisant les identifiants de zones
     const zoneGrid = zones.value.map((row) =>
         row.map((cell) => (cell === -1 ? -1 : colorToZoneMap.get(cell)))
     );
@@ -617,15 +374,12 @@ const submit = async () => {
         zones: zoneGrid,
     };
 
-    // Réinitialiser les données de comparaison
     trmPerformance.value = null;
     baselineResult.value = null;
 
-    // Lancer TRM et Baseline indépendamment (ne pas attendre le baseline pour afficher)
     const trmPromise = axios.post(`${TRM_BASE}/api/solve`, payload);
     const baselinePromise = axios.post(`${BASELINE_BASE}/api/solve`, payload);
 
-    // Afficher le résultat TRM dès qu'il arrive
     let historyEntry = null;
     try {
         const trmRes = await trmPromise;
@@ -663,7 +417,6 @@ const submit = async () => {
             "Erreur lors de la résolution. Vérifiez que le serveur backend fonctionne.";
     }
 
-    // Mettre à jour avec le baseline quand il répond (sans bloquer l'UI)
     baselinePromise.then((baselineRes) => {
         baselineResult.value = baselineRes.data;
         const perf = baselineRes.data?.performance;
@@ -675,7 +428,6 @@ const submit = async () => {
     }).catch(() => { /* baseline optionnel */ });
 };
 
-// Vérifier si la grille est complètement remplie et utilise le bon nombre de couleurs
 const isGridComplete = computed(() => {
     if (!zones.value || zones.value.length !== size.value) {
         return false;
@@ -726,7 +478,6 @@ const onTouchMove = (event) => {
 };
 
 const getCellStyle = (row, col) => {
-    // Garde contre les grilles non initialisées
     if (!zones.value || !zones.value[row] || zones.value[row][col] === undefined) {
         return {
             backgroundColor: "white",
@@ -756,30 +507,24 @@ const getCellStyle = (row, col) => {
     let borderBottom = "1px solid #000";
     let borderRight = "1px solid #000";
 
-    // Bordure du haut - épaisse si voisin différent (case vide ou autre couleur)
     if (row > 0) {
         if (zones.value[row - 1][col] !== currentColor) {
             borderTop = "3px solid #000";
         }
-    } else {
-        // Première ligne - bordure épaisse car c'est le bord de la grille (déjà géré par .grid)
     }
 
-    // Bordure de gauche - épaisse si voisin différent
     if (col > 0) {
         if (zones.value[row][col - 1] !== currentColor) {
             borderLeft = "3px solid #000";
         }
     }
 
-    // Bordure du bas - épaisse si voisin différent
     if (row < size.value - 1) {
         if (zones.value[row + 1][col] !== currentColor) {
             borderBottom = "3px solid #000";
         }
     }
 
-    // Bordure de droite - épaisse si voisin différent
     if (col < size.value - 1) {
         if (zones.value[row][col + 1] !== currentColor) {
             borderRight = "3px solid #000";
@@ -827,7 +572,6 @@ const loadSolution = (index) => {
 };
 
 const loadFromHistory = (entry, index) => {
-    // Restaurer la grille depuis l'historique
     zones.value = entry.grid.map((row) => [...row]);
     solutions.value = entry.solutions.map((sol) => [...sol]);
     size.value = entry.size;
@@ -835,9 +579,8 @@ const loadFromHistory = (entry, index) => {
     currentSolutionIndex.value = 0;
     errorMessage.value = "";
     selectedHistoryIndex.value = index;
-    isPainting.value = false; // Réinitialiser l'état de painting
-    
-    // Charger les times de comparaison s'ils existent (du benchmark)
+    isPainting.value = false;
+
     if (entry.trmTime !== undefined) {
         trmPerformance.value = {
             execution_time: entry.trmTime,
@@ -846,7 +589,7 @@ const loadFromHistory = (entry, index) => {
     } else {
         trmPerformance.value = null;
     }
-    
+
     if (entry.baselineTime !== undefined) {
         baselineResult.value = {
             supported: true,
@@ -864,7 +607,6 @@ const loadFromHistory = (entry, index) => {
 
 const toggleHistorySelection = (entry, index) => {
     if (selectedHistoryIndex.value === index) {
-        // Déselectionner et vider la grille
         initializeZones();
         selectedHistoryIndex.value = -1;
         solutions.value = [];
@@ -874,7 +616,6 @@ const toggleHistorySelection = (entry, index) => {
         trmPerformance.value = null;
         baselineResult.value = null;
     } else {
-        // Charger l'historique
         loadFromHistory(entry, index);
     }
 };
@@ -893,7 +634,6 @@ const generateRandomConnectedPattern = (size) => {
         return arr;
     };
 
-    // Étape 1 : placer N graines en essayant de les espacer
     const seeds = [];
     const minSep = Math.max(1, Math.floor(size / Math.sqrt(size)));
     for (let color = 0; color < size; color++) {
@@ -909,7 +649,6 @@ const generateRandomConnectedPattern = (size) => {
                 placed = true;
             }
         }
-        // Fallback : n'importe quelle cellule libre
         if (!placed) {
             outer: for (let r = 0; r < size; r++)
                 for (let c = 0; c < size; c++)
@@ -917,23 +656,18 @@ const generateRandomConnectedPattern = (size) => {
         }
     }
 
-    // Étape 2 : croissance simultanée des régions (BFS aléatoire)
-    // frontiers[i] = cellules de la couleur i encore capables de s'étendre
     const frontiers = seeds.map(([r, c]) => [[r, c]]);
     let remaining = size * size - size;
     let guard = size * size * 10;
 
     while (remaining > 0 && guard-- > 0) {
-        // Ordre des couleurs aléatoire à chaque tour
         const colorOrder = shuffle(Array.from({ length: size }, (_, i) => i));
         for (const color of colorOrder) {
             if (remaining <= 0) break;
             const frontier = frontiers[color];
             if (frontier.length === 0) continue;
-            // Cellule aléatoire du front
             const fi = Math.floor(Math.random() * frontier.length);
             const [r, c] = frontier[fi];
-            // Direction aléatoire vers une cellule libre
             const sdirs = shuffle([...dirs]);
             let expanded = false;
             for (const [dr, dc] of sdirs) {
@@ -950,7 +684,6 @@ const generateRandomConnectedPattern = (size) => {
         }
     }
 
-    // Sécurité : remplir les cellules orphelines avec la couleur voisine la plus proche
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (zones[r][c] !== -1) continue;
@@ -965,10 +698,8 @@ const generateRandomConnectedPattern = (size) => {
         }
     }
 
-    // Vérification finale : toutes les N couleurs présentes
     const usedColors = new Set(zones.flat());
     if (usedColors.size !== size) {
-        // Fallback ultime : bandes horizontales
         for (let r = 0; r < size; r++)
             for (let c = 0; c < size; c++)
                 zones[r][c] = r;
@@ -982,28 +713,26 @@ const benchmarkAllSizes = async () => {
     benchmarkStatus.value = "Lancement du benchmark...";
     const benchmarkSizes = [4, 5, 6, 7, 8, 9, 10, 11, 12];
     let successCount = 0;
-    
+
     for (let idx = 0; idx < benchmarkSizes.length; idx++) {
         const testSize = benchmarkSizes[idx];
         if (!isBenchmarking.value) break;
 
         const patternName = "Zones aléatoires";
         benchmarkStatus.value = `Test ${testSize}×${testSize} — ${patternName} (${idx + 1}/${benchmarkSizes.length})`;
-        
+
         const testZones = generateRandomConnectedPattern(testSize);
-        
+
         const payload = {
             size: testSize,
             zones: testZones,
         };
-        
-        // Lancer les deux modèles en parallèle
+
         const [trmRes, baselineRes] = await Promise.allSettled([
             axios.post(`${TRM_BASE}/api/solve`, payload),
             axios.post(`${BASELINE_BASE}/api/solve`, payload),
         ]);
-        
-        // Extraire les solutions du TRM
+
         let resultSolutions = [];
         let trm_solutions_count = 0;
         if (trmRes.status === "fulfilled") {
@@ -1011,8 +740,7 @@ const benchmarkAllSizes = async () => {
             trm_solutions_count = trmRes.value.data.performance.solutions_count;
             successCount++;
         }
-        
-        // Ajouter à l'historique (même si 0 solutions, pour montrer les temps)
+
         if (trmRes.status === "fulfilled") {
             history.value.unshift({
                 grid: testZones.map((row) => [...row]),
@@ -1028,9 +756,8 @@ const benchmarkAllSizes = async () => {
             });
             if (history.value.length > MAX_HISTORY) history.value.splice(MAX_HISTORY);
         }
-        
     }
-    
+
     benchmarkStatus.value = `Benchmark terminé! ${successCount}/${benchmarkSizes.length} tests réussis`;
     isBenchmarking.value = false;
     setTimeout(() => {
@@ -1044,30 +771,19 @@ const toggleHistory = () => {
 
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
-    // Espace disponible pour la grille (environ 70% de la largeur et 60% de la hauteur)
     const availableWidth = screenWidth.value * 0.7;
     const availableHeight = screenHeight.value * 0.6;
-
-    // Calculer l'espace nécessaire pour les bordures
-    // Bordure extérieure de la grille: 3px * 2 = 6px (avec box-sizing: border-box, c'est déjà inclus)
-    // Bordures intermédiaires des cellules: environ (n-1) * 1px pour chaque dimension
     const borderSpace = (size.value - 1) * 1;
-
-    // Taille maximale possible pour une case en tenant compte des bordures
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
     const maxCellSizeHeight = (availableHeight - borderSpace - 6) / size.value;
     const maxCellSize = Math.min(maxCellSizeWidth, maxCellSizeHeight);
-
-    // Limiter entre 20px et 60px pour une bonne lisibilité
     return Math.max(20, Math.min(60, Math.floor(maxCellSize)));
 });
 
-// Taille des icônes de reine proportionnelle à la taille des cases
 const queenIconSize = computed(() =>
     Math.max(16, Math.min(40, cellSize.value - 8))
 );
 
-// Fonction pour mettre à jour les dimensions de l'écran
 const updateScreenSize = () => {
     if (typeof window !== "undefined") {
         screenWidth.value = window.innerWidth;
@@ -1112,7 +828,6 @@ const handleKeyDown = (event) => {
     }
 };
 
-// Lifecycle hooks pour gérer les event listeners
 onMounted(() => {
     updateScreenSize();
     window.addEventListener("resize", updateScreenSize);
@@ -1128,7 +843,6 @@ onUnmounted(() => {
     window.removeEventListener("keydown", handleKeyDown);
 });
 
-// Masquer l'historique par défaut sur mobile
 const initializeHistoryVisibility = () => {
     if (isMobile.value && historyVisible.value) {
         historyVisible.value = false;
@@ -1137,7 +851,6 @@ const initializeHistoryVisibility = () => {
     }
 };
 
-// Watcher pour réagir aux changements de taille d'écran
 watch(isMobile, (newIsMobile) => {
     if (newIsMobile && historyVisible.value) {
         historyVisible.value = false;
@@ -1146,7 +859,6 @@ watch(isMobile, (newIsMobile) => {
     }
 });
 
-// Auto-save des brouillons
 watch(zones, () => {
     if (currentDraftIndex.value >= 0) {
         saveDraft();
@@ -1155,7 +867,6 @@ watch(zones, () => {
 
 initializeZones();
 initializeHistoryVisibility();
-// Créer le premier brouillon
 if (drafts.value.length === 0) {
     createNewDraft();
 }
@@ -1165,7 +876,6 @@ defineExpose({
     size,
     paintHistory,
     selectedColor,
-    importMatrixText,
     isGridComplete,
     emptyCellsCount,
     drafts,
@@ -1197,264 +907,22 @@ defineExpose({
                 <i class="ri-bar-chart-grouped-line" aria-hidden="true"></i> Statistiques
             </button>
         </nav>
-        <div v-if="showWelcomeModal || showHelpModal" class="modal-overlay" @click.self="closeCurrentModal">
-            <div class="modal-window welcome-window">
-                <h3>{{ showWelcomeModal ? 'Bienvenue dans le solveur' : 'Aide' }}</h3>
-                <p class="welcome-intro">
-                    Ce guide vous aide à démarrer : colorier les zones, choisir la taille,
-                    utiliser les boutons, consulter l'historique et importer une grille par matrice ou photo.
-                </p>
-                <div class="welcome-section">
-                    <h4>1. Colorier la grille</h4>
-                    <p>
-                        Choisissez une couleur dans la palette à droite, puis utilisez les cliques pour remplir la grille :
-                    </p>
-                    <ul style="margin: 8px 0; padding-left: 20px;">
-                        <li><strong>Clique gauche</strong> : peint la case avec la couleur sélectionnée</li>
-                        <li><strong>Clique droit</strong> : efface la case</li>
-                        <li><strong>Rester enfoncé et glisser</strong> : continue l'action sur plusieurs cases</li>
-                    </ul>
-                    <p>
-                        Chaque couleur représente une zone. Le sélecteur <strong>Taille</strong> permet de définir
-                        la taille de la grille avant de commencer.
-                    </p>
-                </div>
-                <div class="welcome-section">
-                    <h4>2. Historique</h4>
-                    <p>
-                        Chaque grille résolue est sauvegardée dans l'<strong>historique</strong> de votre session.
-                        L'historique affiche le nombre de solutions trouvées et les temps d'exécution du TRM et du baseline.
-                        Cliquez sur une entrée de l'historique pour visualiser les solutions d'une grille antérieure.
-                    </p>
-                </div>
-                <div class="welcome-section">
-                    <h4>3. Boutons principaux</h4>
-                    <div class="welcome-buttons">
-                        <div class="welcome-action">
-                            <button class="guide-btn new-icon-btn" disabled>
-                                <i class="ri-add-line"></i>
-                            </button>
-                            <div>
-                                <strong>Nouvelle grille</strong><br />Crée une grille vide pour repartir à zéro.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn solve-icon-btn">
-                                <i class="ri-check-line"></i>
-                            </button>
-                            <div>
-                                <strong>Résoudre</strong><br />Lance le solveur et compare TRM / baseline.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn reset-icon-btn">
-                                <i class="ri-refresh-line"></i>
-                            </button>
-                            <div>
-                                <strong>Réinitialiser</strong><br />Vide la grille actuelle sans changer la taille.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn random-icon-btn" disabled>
-                                <i class="ri-shuffle-line"></i>
-                            </button>
-                            <div>
-                                <strong>Schéma aléatoire</strong><br />Remplit automatiquement la grille avec un motif de zones aléatoire selon la taille sélectionnée.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn benchmark-icon-btn" disabled>
-                                <i class="ri-bar-chart-line"></i>
-                            </button>
-                            <div>
-                                <strong>Benchmark aléatoire</strong><br />Lance plusieurs résolutions aléatoires pour comparer TRM et Baseline.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn import-icon-btn" disabled>
-                                <i class="ri-upload-cloud-line"></i>
-                            </button>
-                            <div>
-                                <strong>Importer</strong><br />Ouvre le panneau pour charger une matrice ou une image.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn copy-icon-btn" disabled>
-                                <i class="ri-file-copy-line"></i>
-                            </button>
-                            <div>
-                                <strong>Copier la matrice</strong><br />Copie la configuration actuelle de la grille au presse-papiers.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn download-icon-btn" disabled>
-                                <i class="ri-download-line"></i>
-                            </button>
-                            <div>
-                                <strong>Télécharger en image</strong><br />Télécharge la grille actuelle au format PNG pour la partager ou l'importer plus tard.
-                            </div>
-                        </div>
-                        <div class="welcome-action">
-                            <button class="guide-btn help-icon-btn">
-                                <i class="ri-question-line"></i>
-                            </button>
-                            <div>
-                                <strong>Afficher l'aide</strong><br />Ouvre ce guide pour consulter l'aide.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="welcome-section">
-                    <h4>4. Raccourcis clavier</h4>
-                    <ul>
-                        <li><kbd>Entrée</kbd> ou <kbd>Espace</kbd> — Résoudre (quand la grille est complète)</li>
-                        <li><kbd>←</kbd> / <kbd>→</kbd> — Naviguer entre les solutions</li>
-                        <li><kbd>Ctrl+Z</kbd> — Annuler le dernier coup de pinceau</li>
-                        <li><kbd>Échap</kbd> — Fermer le modal actif</li>
-                    </ul>
-                </div>
-                <div class="welcome-section">
-                    <h4>5. Statistiques</h4>
-                    <p>
-                        L'onglet <strong>Statistiques</strong> affiche un graphique de performance pour la session actuelle.
-                        Vous y voyez les temps moyens de TRM et de Baseline par taille de grille, présentés sur une échelle logarithmique.
-                    </p>
-                    <ul>
-                        <li>Le graphique agrège uniquement les résolutions de la session en cours.</li>
-                        <li>Les petites valeurs en microsecondes et les grandes valeurs en secondes sont affichées proportionnellement.</li>
-                    </ul>
-                </div>
-                <div class="welcome-section">
-                    <h4>5. Système d'import</h4>
-                    <p>
-                        Deux modes sont disponibles : <strong>Matrice</strong> et <strong>Image</strong>.
-                    </p>
-                    <ul>
-                        <li>
-                            <strong>Matrice</strong> : collez un tableau carré de nombres comme
-                            <code>0 0 1 1</code> ou <code>0,1,-1,2</code>.
-                            <em>-1</em> signifie case vide, les autres nombres définissent les zones.
-                        </li>
-                        <li>
-                            <strong>Image</strong> : sélectionnez une photo de la grille.
-                            Le backend analyse l'image et en extrait automatiquement la matrice de zones.
-                        </li>
-                    </ul>
-                </div>
-                <div class="welcome-section">
-                    <h4>6. Brouillons</h4>
-                    <p>
-                        Chaque nouvelle grille crée un brouillon enregistré en bas de l'écran.
-                        Vous pouvez basculer entre plusieurs brouillons comme des onglets,
-                        et supprimer ceux dont vous n'avez plus besoin.
-                    </p>
-                    <ul>
-                        <li>
-                            Les brouillons sont visibles dans le panneau en bas, en tant qu'onglets.
-                        </li>
-                        <li>
-                            La grille en cours est automatiquement sauvegardée lorsque vous changez de brouillon.
-                        </li>
-                        <li>
-                            Il y a une limite de <strong>15 brouillons</strong> maximum,
-                            les plus anciens sont supprimés au-delà de ce nombre.
-                        </li>
-                    </ul>
-                </div>
-                <div class="welcome-section">
-                    <h4>7. Modèles</h4>
-                    <p>
-                        Un <strong>modèle</strong> désigne ici un algorithme de résolution : une stratégie logique
-                        que le programme applique pour trouver les placements valides des reines sur la grille.
-                        Ce n'est pas un modèle d'intelligence artificielle entraîné, mais un <em>solveur algorithmique</em>
-                        — une suite d'instructions qui explore les possibilités et déduit la solution par raisonnement.
-                        L'application compare deux modèles à chaque résolution pour vous montrer leurs différences de performance.
-                    </p>
-                    <div class="model-cards">
-                        <div class="model-card">
-                            <div class="model-card-header model-trm">
-                                <span class="model-badge">TRM</span>
-                                <strong>Tiny Recursive Model</strong>
-                            </div>
-                            <p>
-                                Le TRM est un solveur par <strong>backtracking récursif optimisé</strong> avec plusieurs techniques avancées.
-                                Il utilise des <em>bitsets</em> pour des opérations de domaine en O(1), une <strong>vérification d'adjacence en O(1)</strong>
-                                (comparaison avec la ligne précédente uniquement), et du <em>forward-checking</em> pour anticiper les impasses.
-                                Il explore un espace de recherche drastiquement réduit.
-                            </p>
-                            <ul>
-                                <li>Bitsets (opérations bit-à-bit) pour les colonnes et zones libres</li>
-                                <li>Vérification d'adjacence O(1) : uniquement avec la ligne précédente</li>
-                                <li>Forward-checking multi-lignes : atteignabilité des zones libres</li>
-                                <li>Typiquement <strong>×1.5 à ×2 plus rapide</strong> que le baseline</li>
-                            </ul>
-                        </div>
-                        <div class="model-card">
-                            <div class="model-card-header model-baseline">
-                                <span class="model-badge">Baseline</span>
-                                <strong>Backtracking naïf exhaustif</strong>
-                            </div>
-                            <p>
-                                Le Baseline est un solveur par <strong>backtracking exhaustif sans optimisation</strong>.
-                                Il utilise une <strong>vérification d'adjacence en O(n)</strong> (boucle sur toutes les lignes précédentes)
-                                et n'emploie aucune technique de pruning ou d'anticipation. Il explore activement un arbre complet
-                                avant de découvrir les contradictions.
-                            </p>
-                            <ul>
-                                <li>Vérification d'adjacence O(n) : boucle sur toutes les reines placées</li>
-                                <li>Aucune optimisation, aucun forward-checking</li>
-                                <li>Trouve toutes les solutions comme le TRM, mais explore davantage d'états</li>
-                                <li>Sert de référence pour mesurer le gain des optimisations du TRM</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <p style="margin-top: 10px; font-size: 0.85em; color: var(--text-secondary, #888);">
-                        Les deux modèles produisent exactement les mêmes solutions — la différence réside dans le nombre d'états
-                        explorés et donc la <em>vitesse d'exécution</em>. Le TRM explore typiquement 20 à 50 % d'états en moins.
-                    </p>
-                </div>
-                <div class="welcome-actions">
-                    <button class="solve-btn" type="button" @click="closeCurrentModal">
-                        {{ showWelcomeModal ? 'J\'ai compris, continuer' : 'Fermer l\'aide' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+
+        <HelpWelcomeModal
+            :model-value="showWelcomeModal || showHelpModal"
+            :mode="showWelcomeModal ? 'welcome' : 'help'"
+            @close="closeCurrentModal"
+        />
+
         <BenchmarkChart v-if="currentView === 'stats'" :history="history" />
         <div v-if="currentView === 'game'" class="main-layout" :class="{ 'history-hidden': !historyVisible }">
-            <div v-if="historyVisible" class="history-panel">
-                <h3>Historique</h3>
-                <div v-if="history.length === 0" class="no-history">
-                    Aucune grille résolue
-                </div>
-                <div v-else class="history-list">
-                    <div
-                        v-for="(entry, index) in history"
-                        :key="index"
-                        class="history-entry"
-                        :class="{ selected: selectedHistoryIndex === index }"
-                        @click="toggleHistorySelection(entry, index)"
-                    >
-                        <div class="history-entry-header">
-                            <span class="history-entry-title"
-                                >{{ entry.size }}x{{ entry.size }}</span
-                            >
-                            <span class="history-entry-time">{{
-                                entry.timestamp
-                            }}</span>
-                        </div>
-                        <div v-if="entry.patternName" class="history-entry-pattern">
-                            {{ entry.patternName }}
-                        </div>
-                        <div class="history-entry-solutions">
-                            {{ entry.solutions.length > 0 ? `${entry.solutions.length} solution${entry.solutions.length > 1 ? "s" : ""}` : "Aucune solution" }}
-                        </div>
-                        <div v-if="entry.trmTime !== undefined" class="history-entry-times">
-                            <span class="entry-time-trm" title="TRM">TRM: {{ formatTime(entry.trmTime) }}</span>
-                            <span v-if="entry.baselineTime !== null" class="entry-time-baseline" title="Baseline">Baseline: {{ formatTime(entry.baselineTime) }}</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="history-slot">
+                <HistoryPanel
+                    :history="history"
+                    :visible="historyVisible"
+                    :selected-index="selectedHistoryIndex"
+                    @restore="toggleHistorySelection($event.entry, $event.index)"
+                />
             </div>
             <div class="grid-container">
                 <div class="grid-header">
@@ -1692,7 +1160,7 @@ defineExpose({
                 </div>
             </div>
         </div>
-        
+
         <!-- Onglets de brouillons - FIXE en bas -->
         <div v-if="currentView !== 'stats' && drafts.length > 0" class="drafts-panel">
             <div class="drafts-tabs">
@@ -1714,155 +1182,14 @@ defineExpose({
             </div>
         </div>
 
-        <div v-if="isImportModalOpen" class="modal-overlay" @click.self="closeImportModal">
-            <div class="modal-window">
-                <h3>Importer une image</h3>
-                <p v-if="importMode === 'text'">
-                    Collez une matrice carrée de taille minimale 4×4. Séparateurs supportés&nbsp;: espace, virgule ou point-virgule.
-                </p>
-                <p v-else>
-                    Importez une image de grille. Le backend analysera l'image et en extraira une matrice de zones.
-                </p>
-                <p class="modal-note">
-                    Une zone est définie par un même identifiant entier :
-                    <strong>0, 1, 2, ...</strong>. Le même nombre signifie la même zone/couleur.
-                    Utilisez <strong>-1</strong> pour une cellule vide.
-                </p>
-                <div class="import-mode-switch">
-                    <button
-                        type="button"
-                        class="mode-btn"
-                        :class="{ active: importMode === 'text' }"
-                        @click="selectImportMode('text')"
-                    >
-                        Matrice
-                    </button>
-                    <button
-                        type="button"
-                        class="mode-btn"
-                        :class="{ active: importMode === 'photo' }"
-                        @click="selectImportMode('photo')"
-                    >
-                        Image
-                    </button>
-                </div>
-                <div class="modal-import-content">
-                    <div v-if="importMode === 'text'" class="import-textarea-panel">
-                        <textarea
-                            v-model="importMatrixText"
-                            class="matrix-textarea"
-                            :class="{ invalid: importParseError }"
-                            :placeholder="importPlaceholder"
-                        ></textarea>
-                        <button
-                            class="legend-toggle-btn"
-                            type="button"
-                            @click="toggleImportLegend"
-                        >
-                            {{ showImportLegend ? "Masquer la légende" : "Afficher la légende" }}
-                        </button>
-                        <div v-if="showImportLegend" class="modal-legend">
-                            <div class="legend-title">Légende de la matrice</div>
-                            <div
-                                v-for="item in importLegendItems"
-                                :key="item.value"
-                                class="legend-row"
-                            >
-                                <span
-                                    class="legend-color"
-                                    :class="{ 'empty-cell': item.isEmpty }"
-                                    :style="{
-                                        backgroundColor: item.isEmpty ? '#fff' : item.color,
-                                    }"
-                                ></span>
-                                <span>{{ item.label }}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div v-else class="import-image-panel">
-                        <label class="file-input-label" for="photo-upload">
-                            Choisissez un fichier image
-                        </label>
-                        <input
-                            id="photo-upload"
-                            type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/gif"
-                            @change="handleImportFileChange"
-                        />
-                        <div class="image-input-note">
-                            Formats supportés : PNG, JPG, GIF.
-                        </div>
-                        <button
-                            class="solve-btn"
-                            type="button"
-                            @click="uploadImportImage"
-                            :disabled="!importFile || importImageLoading"
-                        >
-                            {{ importImageLoading ? 'Extraction...' : 'Extraire depuis l’image' }}
-                        </button>
-                        <div v-if="importImagePreviewUrl" class="image-preview">
-                            <img
-                                :src="importImagePreviewUrl"
-                                alt="Aperçu de l'image importée"
-                            />
-                        </div>
-                        <div v-if="importImageResult" class="image-result">
-                            <div>
-                                <strong>Taille :</strong> {{ importImageResult.size }}×{{ importImageResult.size }}
-                            </div>
-                            <div>
-                                <strong>Confiance :</strong> {{ (importImageResult.confidence * 100).toFixed(0) }}%
-                            </div>
-                        </div>
-                    </div>
-                    <div class="import-preview">
-                        <div class="legend-title">Prévisualisation</div>
-                        <div v-if="activeImportPreviewMatrix" class="import-preview-grid">
-                            <div
-                                v-for="(row, rowIndex) in activeImportPreviewMatrix"
-                                :key="rowIndex"
-                                class="import-preview-row"
-                                :style="{ gridTemplateColumns: `repeat(${row.length}, minmax(18px, 1fr))` }"
-                            >
-                                <div
-                                    v-for="(cell, colIndex) in row"
-                                    :key="colIndex"
-                                    class="import-preview-cell"
-                                    :style="{
-                                        backgroundColor:
-                                            cell.value === -1 ? '#fff' : colors[cell.value],
-                                        color: cell.value === -1 ? '#999' : '#000',
-                                        borderColor: cell.value === -1 ? '#ccc' : '#000'
-                                    }"
-                                >
-                                    {{ cell.raw === '' ? '-' : cell.raw }}
-                                </div>
-                            </div>
-                        </div>
-                        <div v-else class="preview-empty">
-                            {{ importMode === 'text'
-                                ? 'Entrez une matrice valide pour voir l’aperçu.'
-                                : 'Importez une photo et extrayez la matrice pour voir l’aperçu.' }}
-                        </div>
-                    </div>
-                </div>
-                <div v-if="importError || importParseError" class="modal-error">
-                    {{ importError || importParseError }}
-                </div>
-                <div class="modal-actions">
-                    <button class="reset-btn" @click="closeImportModal">
-                        Annuler
-                    </button>
-                    <button
-                        class="solve-btn"
-                        @click="applyImportedMatrix"
-                        :disabled="!importIsValid"
-                    >
-                        Valider
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ImportModal
+            ref="importModalRef"
+            :visible="isImportModalOpen"
+            :colors="colors"
+            :trm-base="TRM_BASE"
+            @apply="onMatrixApplied"
+            @close="closeImportModal"
+        />
     </div>
 </template>
 
@@ -1960,10 +1287,10 @@ body,
 }
 
 .main-layout.history-hidden {
-    grid-template-columns: 0 1fr 250px;
+    grid-template-columns: 0 1fr 18vw;
 }
 
-.main-layout.history-hidden .history-panel {
+.main-layout.history-hidden .history-slot {
     display: none;
 }
 
@@ -1988,7 +1315,7 @@ body,
         grid-template-columns: 1fr;
     }
 
-    .history-panel {
+    .history-slot {
         order: -1;
         max-width: none;
         width: 100%;
@@ -2246,28 +1573,6 @@ body,
     text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
 }
 
-.solve-btn {
-    padding: 1vh 2vw;
-    font-size: 1rem;
-    cursor: pointer;
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    transition: background-color 0.3s;
-    margin-top: 2vh;
-    font-weight: bold;
-}
-
-.solve-btn:hover:not(:disabled) {
-    background-color: #45a049;
-}
-
-.solve-btn:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
 .error-message {
     margin-top: 1vh;
     padding: 1vh 1.5vw;
@@ -2359,24 +1664,6 @@ body,
     background: rgba(211,47,47,0.1);
 }
 
-.reset-btn {
-    padding: 1vh 2vw;
-    font-size: 1rem;
-    cursor: pointer;
-    background-color: #d32f2f;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    transition: background-color 0.3s;
-    margin-top: 1vh;
-    margin-left: 1vw;
-    font-weight: bold;
-}
-
-.reset-btn:hover {
-    background-color: #b71c1c;
-}
-
 .icon-btn svg {
     width: 20px;
     height: 20px;
@@ -2455,7 +1742,6 @@ body,
     box-shadow: 0 3px 8px rgba(255, 152, 0, 0.5);
 }
 
-
 .benchmark-status {
     margin-top: 1vh;
     padding: 0.8vh 1.5vw;
@@ -2468,484 +1754,9 @@ body,
     font-weight: 500;
 }
 
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    z-index: 999;
-}
-
-.modal-window {
-    width: min(100%, 700px);
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
-    padding: 1.5rem;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.modal-window h3 {
-    margin-top: 0;
-    margin-bottom: 0.75rem;
-}
-
-.welcome-window {
-    max-width: 760px;
-}
-
-.welcome-intro {
-    margin-bottom: 1rem;
-    color: #444;
-    font-size: 0.98rem;
-}
-
-.welcome-section {
-    margin-bottom: 1.2rem;
-}
-
-.welcome-section h4 {
-    margin-bottom: 0.5rem;
-    font-size: 1rem;
-    color: #111;
-}
-
-.welcome-section p,
-.welcome-section ul {
-    margin: 0;
-    color: #444;
-    line-height: 1.55;
-    font-size: 0.95rem;
-}
-
-.welcome-section ul {
-    padding-left: 1.2rem;
-    margin-top: 0.7rem;
-}
-
-.welcome-section li {
-    margin-bottom: 0.7rem;
-}
-
-.model-cards {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-    margin-top: 0.8rem;
-}
-
-.model-card {
-    border: 1px solid #e3e8f0;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #fbfbff;
-}
-
-.model-card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.7rem 1rem;
-    font-size: 0.95rem;
-}
-
-.model-trm {
-    background: linear-gradient(90deg, #e8f0fe 0%, #f0f4ff 100%);
-    border-bottom: 1px solid #c5d5f8;
-}
-
-.model-baseline {
-    background: linear-gradient(90deg, #fef3e8 0%, #fff8f0 100%);
-    border-bottom: 1px solid #f8d5a0;
-}
-
-.model-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    background: rgba(0,0,0,0.08);
-    color: #333;
-}
-
-.model-card p,
-.model-card ul {
-    padding: 0.7rem 1rem;
-    margin: 0;
-    font-size: 0.9rem;
-    color: #444;
-    line-height: 1.5;
-}
-
-.model-card ul {
-    padding-top: 0;
-    padding-left: 2rem;
-}
-
-.model-card li {
-    margin-bottom: 0.3rem;
-}
-
-@media (max-width: 540px) {
-    .model-cards {
-        grid-template-columns: 1fr;
-    }
-}
-
-.welcome-buttons {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-.welcome-action {
-    display: flex;
-    gap: 0.9rem;
-    align-items: flex-start;
-    padding: 1rem;
-    border: 1px solid #e3e8f0;
-    border-radius: 14px;
-    background: #fbfbff;
-}
-
-.guide-btn {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: #fff;
-    color: #333;
-    cursor: default;
-    opacity: 1;
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.welcome-action .guide-btn i {
-    font-size: 1.1rem;
-    color: inherit;
-}
-
-.welcome-action .guide-btn.benchmark-icon-btn,
-.welcome-action .guide-btn.benchmark-icon-btn:disabled {
-    background-color: #1565c0 !important;
-    color: #fff !important;
-    border: none !important;
-    box-shadow: 0 2px 6px rgba(21, 101, 192, 0.3) !important;
-}
-
-.welcome-action .guide-btn.import-icon-btn,
-.welcome-action .guide-btn.import-icon-btn:disabled {
-    background-color: #9c27b0 !important;
-    color: #fff !important;
-    border: none !important;
-    box-shadow: 0 2px 6px rgba(156, 39, 176, 0.3) !important;
-}
-
-.guide-btn:disabled {
-    opacity: 1;
-    background: #fff;
-    color: #333;
-}
-
-.welcome-action .guide-btn.random-icon-btn,
-.welcome-action .guide-btn.random-icon-btn:disabled {
-    background-color: #fff;
-    color: #111;
-}
-
-.welcome-action .guide-btn.benchmark-icon-btn:disabled,
-.welcome-action .guide-btn.import-icon-btn:disabled,
-.welcome-action .guide-btn.copy-icon-btn:disabled,
-.welcome-action .guide-btn.download-icon-btn:disabled,
-.welcome-action .guide-btn.help-icon-btn:disabled,
-.welcome-action .guide-btn.new-icon-btn:disabled,
-.welcome-action .guide-btn.solve-icon-btn:disabled,
-.welcome-action .guide-btn.reset-icon-btn:disabled {
-    background: inherit;
-}
-
-.welcome-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 1rem;
-}
-
-.welcome-actions .solve-btn {
-    padding: 0.95rem 1.5rem;
-}
-
-.welcome-window kbd {
-    display: inline-block;
-    background: #f1f5f9;
-    color: #1f2937;
-    border: 1px solid #cbd5e1;
-    border-bottom-width: 2px;
-    padding: 0.1rem 0.45rem;
-    border-radius: 5px;
-    font-family: monospace;
-    font-size: 0.82em;
-}
-
-.welcome-window code {
-    background: #f1f5f9;
-    color: #1f2937;
-    padding: 0.15rem 0.4rem;
-    border-radius: 6px;
-    font-size: 0.92rem;
-}
-
-@media (max-width: 800px) {
-    .welcome-buttons {
-        grid-template-columns: 1fr;
-    }
-}
-
-.modal-window p {
-    margin: 0 0 1rem 0;
-    color: #444;
-    line-height: 1.5;
-}
-
-.matrix-textarea {
-    width: 100%;
-    min-height: 180px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    padding: 1rem;
-    font-size: 0.95rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    resize: vertical;
-}
-
-.matrix-textarea.invalid {
-    border: 1px solid #d32f2f;
-    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.18);
-}
-
-.modal-error {
-    margin-top: 1rem;
-    padding: 0.85rem 1rem;
-    background: #ffebee;
-    color: #c62828;
-    border: 1px solid #f8bdbd;
-    border-radius: 8px;
-    font-size: 0.9rem;
-}
-
-.modal-actions {
-    margin-top: 1.25rem;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.modal-actions button {
-    min-width: 130px;
-    margin-top: 0;
-    margin-left: 0;
-    flex: 1;
-}
-
-.modal-actions .solve-btn,
-.modal-actions .reset-btn {
-    width: auto;
-}
-
-.import-mode-switch {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.mode-btn {
-    flex: 1;
-    border: 1px solid #c5cfe8;
-    border-radius: 8px;
-    padding: 0.85rem 1rem;
-    background: #fff;
-    color: #1f2937;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.mode-btn.active {
-    background: #1976d2;
-    color: #fff;
-    border-color: #115293;
-}
-
-.import-image-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.file-input-label {
-    font-weight: 700;
-}
-
-.image-input-note {
-    font-size: 0.9rem;
-    color: #555;
-}
-
-.image-preview {
-    border: 1px solid #d0d8f0;
-    border-radius: 12px;
-    padding: 0.75rem;
-    background: #fff;
-}
-
-.image-preview img {
-    width: 100%;
-    height: auto;
-    display: block;
-    border-radius: 10px;
-}
-
-.image-result {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.85rem 1rem;
-    border: 1px solid #d5dcef;
-    border-radius: 10px;
-    background: #f7f9ff;
-}
-
-.legend-toggle-btn {
-    background: #1976d2;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 0.85rem 1.25rem;
-    margin-bottom: 1rem;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.legend-toggle-btn:hover {
-    background: #115293;
-}
-
-.modal-import-content {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 1rem;
-    align-items: start;
-}
-
-.import-textarea-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.import-preview {
-    background: #f7f9ff;
-    border: 1px solid #d0d8f0;
-    border-radius: 12px;
-    padding: 1rem;
-    min-width: 220px;
-    max-height: 400px;
-    overflow: auto;
-}
-
-.import-preview-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    width: 100%;
-    overflow-x: auto;
-}
-
-.import-preview-row {
-    display: grid;
-    gap: 0.15rem;
-    width: 100%;
-}
-
-.import-preview-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    min-height: 18px;
-    aspect-ratio: 1 / 1;
-    padding: 0.2rem;
-    font-size: 0.75rem;
-    border: 1px solid #000;
-    border-radius: 6px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.preview-empty {
-    color: #555;
-    font-size: 0.95rem;
-    min-height: 160px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-.modal-legend {
-    padding: 1rem;
-    background: #f4f7ff;
-    border: 1px solid #d5dcef;
-    border-radius: 12px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-}
-
-.modal-legend .legend-title {
-    width: 100%;
-    margin-bottom: 0.5rem;
-}
-
-.modal-legend .legend-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.75rem;
-    background: white;
-    border: 1px solid #d0d8f0;
-    border-radius: 12px;
-    margin-bottom: 0;
-    white-space: nowrap;
-}
-
-.modal-legend .legend-color.empty-cell {
-    background: #ffffff;
-    border-color: #999;
-}
-
 .header-status {
     width: 100%;
     margin-top: 0.75rem;
-}
-
-.sidebar-status {
-    width: 100%;
 }
 
 /* --- Panneau de comparaison des modèles --- */
@@ -3069,76 +1880,6 @@ body,
     overflow-y: auto;
 }
 
-.legend-panel {
-    width: 100%;
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #ffffff;
-    border: 1px solid #dfe3e8;
-    border-radius: 12px;
-}
-
-.legend-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    margin-bottom: 0.75rem;
-    color: #333;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    color: #444;
-}
-
-.legend-color {
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 1px solid #bbb;
-    display: inline-block;
-}
-
-.legend-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.8rem 1rem;
-    margin-bottom: 1rem;
-    background: #f0f4ff;
-    color: #1565c0;
-    border: 1px solid #90caf9;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-    width: 100%;
-    text-align: center;
-}
-
-.legend-toggle-btn:hover {
-    background: #e3f2fd;
-}
-
-.modal-legend {
-    margin-bottom: 1rem;
-    padding: 0.8rem 1rem;
-    background: #f3f6ff;
-    border-radius: 10px;
-    border: 1px solid #d0d8f0;
-}
-
-.legend-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.4rem;
-    font-size: 0.9rem;
-    color: #333;
-}
-
 .color-btn {
     width: 50px;
     height: 50px;
@@ -3177,114 +1918,6 @@ body,
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25),
             0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(59, 130, 246, 0);
     }
-}
-
-.history-panel {
-    background-color: #ffffff;
-    padding: 0;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    max-height: calc(100vh - 6rem);
-    overflow-y: auto;
-    border: 1px solid #e5e7eb;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    align-self: start;
-}
-
-.history-panel h3 {
-    margin: 0;
-    padding: 20px;
-    color: #111827;
-    font-size: 1.1rem;
-    font-weight: 600;
-    border-bottom: 1px solid #e5e7eb;
-    background-color: #f9fafb;
-    border-radius: 8px 8px 0 0;
-}
-
-.no-history {
-    color: #6b7280;
-    font-style: italic;
-    text-align: center;
-    padding: 40px 20px;
-    font-size: 14px;
-}
-
-.history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.history-entry {
-    padding: 16px 20px;
-    background-color: white;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-}
-
-.history-entry:hover {
-    background-color: #f3f4f6;
-}
-
-.history-entry.selected {
-    background-color: #dbeafe;
-    border-left: 4px solid #3b82f6;
-}
-
-.history-entry:last-child {
-    border-bottom: none;
-}
-
-.history-entry-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-}
-
-.history-entry-title {
-    font-weight: 600;
-    color: #111827;
-}
-
-.history-entry-time {
-    font-size: 12px;
-    color: #9ca3af;
-}
-
-.history-entry-solutions {
-    color: #6b7280;
-    font-size: 13px;
-}
-
-.history-entry-pattern {
-    font-size: 11px;
-    color: #9ca3af;
-    font-style: italic;
-    margin-top: 1px;
-}
-
-.history-entry-times {
-    display: flex;
-    gap: 8px;
-    margin-top: 3px;
-}
-
-.entry-time-trm {
-    font-size: 11px;
-    color: #10b981;
-    font-weight: 600;
-}
-
-.entry-time-baseline {
-    font-size: 11px;
-    color: #f59e0b;
-    font-weight: 600;
 }
 
 .solutions-info {
@@ -3329,31 +1962,5 @@ body,
     color: #666;
     margin-left: 1vw;
     align-self: center;
-}
-
-.reset-btn {
-    padding: 0.8vh 1.5vw;
-    font-size: 0.9rem;
-    cursor: pointer;
-    background-color: #f44336;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    transition: background-color 0.3s;
-    margin-top: 1vh;
-}
-
-.queens-display {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-}
-
-.queen-svg {
-    width: 40px;
-    height: 40px;
-    fill: #000;
 }
 </style>

@@ -340,7 +340,7 @@ defineExpose({ open });
                         @click="uploadImportImage"
                         :disabled="!importFile || importImageLoading"
                     >
-                        {{ importImageLoading ? 'Extraction...' : 'Extraire depuis l'image' }}
+                        {{ importImageLoading ? 'Extraction...' : "Extraire depuis l'image" }}
                     </button>
                     <div v-if="importImagePreviewUrl" class="image-preview">
                         <img
@@ -383,8 +383,8 @@ defineExpose({ open });
                     </div>
                     <div v-else class="preview-empty">
                         {{ importMode === 'text'
-                            ? 'Entrez une matrice valide pour voir l'aperçu.'
-                            : 'Importez une photo et extrayez la matrice pour voir l'aperçu.' }}
+                            ? "Entrez une matrice valide pour voir l'aperçu."
+                            : "Importez une photo et extrayez la matrice pour voir l'aperçu." }}
                     </div>
                 </div>
             </div>

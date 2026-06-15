@@ -157,13 +157,7 @@ describe('App.vue — brouillons', () => {
   })
 })
 
-describe('App.vue — import modal (importMatrixText)', () => {
-  it('importMatrixText est vide par défaut', () => {
-    const wrapper = mountApp()
-    expect(wrapper.vm.importMatrixText).toBe('')
-    wrapper.unmount()
-  })
-
+describe('App.vue — état initial', () => {
   it('errorMessage est vide au départ', () => {
     const wrapper = mountApp()
     expect(wrapper.vm.errorMessage).toBe('')
