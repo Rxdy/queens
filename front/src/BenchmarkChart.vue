@@ -77,7 +77,8 @@ const groupX     = (i) => i * groupW.value + groupW.value / 2;
 const tooltip = ref({ visible: false, x: 0, y: 0, lines: [] });
 
 const showTooltip = (event, d, kind) => {
-  const rect  = event.currentTarget.closest("svg").getBoundingClientRect();
+  const container = event.currentTarget.closest(".svg-container");
+  const rect = container.getBoundingClientRect();
   const time  = kind === "trm" ? d.trm  : d.baseline;
   const count = kind === "trm" ? d.trmCount : d.baselineCount;
   const label = kind === "trm" ? "TRM" : "Baseline";
@@ -92,9 +93,7 @@ const showTooltip = (event, d, kind) => {
 
 const moveTooltip = (event) => {
   if (!tooltip.value.visible) return;
-  const svg = event.currentTarget.querySelector("svg");
-  if (!svg) return;
-  const rect = svg.getBoundingClientRect();
+  const rect = event.currentTarget.getBoundingClientRect();
   tooltip.value.x = event.clientX - rect.left;
   tooltip.value.y = event.clientY - rect.top;
 };
@@ -137,11 +136,15 @@ const hideTooltip = () => { tooltip.value.visible = false; };
         <line :x1="ML" :y1="MT" :x2="ML" :y2="MT+PH" class="axis-line"/>
         <line :x1="ML" :y1="MT+PH" :x2="ML+PW" :y2="MT+PH" class="axis-line"/>
 
-        <g v-if="tooltip.visible">
-          <rect :x="tooltip.x+10" :y="tooltip.y-14" :width="tooltip.lines.reduce((m,l)=>Math.max(m,l.length*6.6),0)+20" :height="tooltip.lines.length*18+10" class="tooltip-bg" rx="5"/>
-          <text v-for="(line,li) in tooltip.lines" :key="li" :x="tooltip.x+20" :y="tooltip.y+4+li*18" class="tooltip-text" :class="{'tooltip-header':li===0}">{{ line }}</text>
-        </g>
       </svg>
+
+      <div
+        v-if="tooltip.visible"
+        class="tooltip-box"
+        :style="{ left: tooltip.x + 14 + 'px', top: tooltip.y - 14 + 'px' }"
+      >
+        <div v-for="(line, li) in tooltip.lines" :key="li" :class="{ 'tooltip-header': li === 0 }">{{ line }}</div>
+      </div>
     </div>
 
     <p class="chart-note">
@@ -174,9 +177,20 @@ const hideTooltip = () => { tooltip.value.visible = false; };
 .baseline-bar { fill:#f4a55a; }
 .bar-value { font-size:9px; fill:#444; text-anchor:middle; pointer-events:none; }
 .speedup-label { font-size:9.5px; fill:#2e7d32; font-weight:700; text-anchor:middle; pointer-events:none; }
-.tooltip-bg { fill:rgba(28,28,28,0.9); filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3)); }
-.tooltip-text { fill:#f0f0f0; font-size:11.5px; pointer-events:none; }
-.tooltip-header { font-weight:700; fill:#fff; font-size:12px; }
+.tooltip-box {
+  position: absolute;
+  background: rgba(28,28,28,0.92);
+  color: #f0f0f0;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 100;
+}
+.tooltip-box .tooltip-header { font-weight: 700; color: #fff; margin-bottom: 2px; }
 .no-data { color:#888; font-size:0.9rem; text-align:center; padding:40px 20px; border:2px dashed #ccc; border-radius:10px; width:100%; }
 .kbd { display:inline-flex; align-items:center; background:#eee; border-radius:4px; padding:1px 5px; font-size:0.85em; color:#333; }
 .chart-note { font-size:0.78rem; color:#999; text-align:center; margin:0; max-width:600px; }
