@@ -620,6 +620,12 @@ const toggleHistorySelection = (entry, index) => {
     }
 };
 
+// Mobile : restaurer depuis l'onglet Historique puis revenir à la grille pour la voir.
+const restoreFromHistory = (payload) => {
+    toggleHistorySelection(payload.entry, payload.index);
+    currentView.value = "game";
+};
+
 // Génère N zones connexes aléatoires couvrant toutes les cellules (règle du jeu).
 // Algorithme : croissance régionale depuis N graines aléatoires (flood-fill)
 // → garantit que chaque zone est d'un seul tenant.
@@ -778,7 +784,7 @@ const cellSize = computed(() => {
     const availableWidth =
         screenWidth.value * (isMobile ? 0.96 : 0.7) - paletteStrip;
     const availableHeight = isMobile
-        ? screenHeight.value - 175
+        ? screenHeight.value - 200
         : screenHeight.value * 0.6;
     const borderSpace = (size.value - 1) * 1;
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
@@ -907,6 +913,14 @@ defineExpose({
                 <i class="ri-grid-line" aria-hidden="true"></i> Jeu
             </button>
             <button
+                v-if="screenWidth <= 600"
+                class="view-tab"
+                :class="{ active: currentView === 'history' }"
+                @click="currentView = 'history'"
+            >
+                <i class="ri-history-line" aria-hidden="true"></i> Historique
+            </button>
+            <button
                 class="view-tab"
                 :class="{ active: currentView === 'stats' }"
                 @click="currentView = 'stats'"
@@ -922,6 +936,16 @@ defineExpose({
         />
 
         <BenchmarkChart v-if="currentView === 'stats'" :history="history" />
+
+        <div v-if="currentView === 'history'" class="history-view">
+            <HistoryPanel
+                :history="history"
+                :visible="true"
+                :selected-index="selectedHistoryIndex"
+                @restore="restoreFromHistory"
+            />
+        </div>
+
         <div v-if="currentView === 'game'" class="main-layout" :class="{ 'history-hidden': !historyVisible }">
             <div class="history-slot">
                 <HistoryPanel
@@ -1509,13 +1533,6 @@ body,
     box-sizing: border-box;
 }
 
-@media (max-width: 600px) {
-    .cell {
-        width: 35px;
-        height: 35px;
-    }
-}
-
 .cell:hover {
     opacity: 0.8;
 }
@@ -1971,22 +1988,52 @@ body,
         overflow: hidden;
     }
 
-    /* Barre d'outils compacte : rangée horizontale qui reste en haut */
     .grid-header {
         width: 100%;
     }
 
+    /* Actions : barre fixe en bas de l'écran (elles ne tiennent plus en haut) */
     .grid-toolbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
         display: flex;
-        flex-flow: row wrap;
-        gap: 5px;
-        justify-content: center;
+        flex-flow: row nowrap;
+        gap: 4px;
+        justify-content: space-around;
+        align-items: center;
+        padding: 6px 4px;
+        background: #fff;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
     }
 
     .grid-toolbar .icon-btn {
-        width: 34px;
-        height: 34px;
-        font-size: 0.9rem;
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+        flex: 0 0 auto;
+    }
+
+    /* On réserve la place de la barre d'actions fixe */
+    .main-layout,
+    .main-layout.history-hidden {
+        padding-bottom: 52px;
+    }
+
+    /* Brouillons masqués sur mobile (évite le chevauchement avec la barre) */
+    .drafts-panel {
+        display: none;
+    }
+
+    /* Vue Historique plein écran (onglet mobile) */
+    .history-view {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        overflow-y: auto;
+        padding: 0 1vw 52px;
     }
 
     /* Sélecteur de taille compact, en haut sous la barre d'outils */
