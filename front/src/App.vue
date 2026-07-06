@@ -771,8 +771,9 @@ const toggleHistory = () => {
 
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
-    const availableWidth = screenWidth.value * 0.7;
-    const availableHeight = screenHeight.value * 0.6;
+    const isMobile = screenWidth.value <= 900;
+    const availableWidth = screenWidth.value * (isMobile ? 0.92 : 0.7);
+    const availableHeight = screenHeight.value * (isMobile ? 0.55 : 0.6);
     const borderSpace = (size.value - 1) * 1;
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
     const maxCellSizeHeight = (availableHeight - borderSpace - 6) / size.value;
@@ -1203,7 +1204,7 @@ html,
 body,
 #app {
     width: 100%;
-    height: 100vh;
+    height: 100dvh;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -1213,8 +1214,8 @@ body,
 
 <style scoped>
 .app {
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1332,6 +1333,22 @@ body,
         order: 0;
         max-width: none;
         width: 100%;
+    }
+}
+
+@media (max-width: 900px) {
+    html,
+    body,
+    #app {
+        height: auto;
+        min-height: 100dvh;
+        overflow-y: auto;
+    }
+
+    .app {
+        height: auto;
+        min-height: 100dvh;
+        overflow-y: auto;
     }
 }
 
@@ -1586,7 +1603,7 @@ body,
 }
 
 .drafts-panel {
-    width: 100vw;
+    width: 100%;
     max-width: none;
     padding: 3px 8px 0;
     background-color: #f0f0f0;
