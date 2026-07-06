@@ -771,14 +771,18 @@ const toggleHistory = () => {
 
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
-    const isMobile = screenWidth.value <= 900;
-    const availableWidth = screenWidth.value * (isMobile ? 0.92 : 0.7);
-    const availableHeight = screenHeight.value * (isMobile ? 0.55 : 0.6);
+    const isMobile = screenWidth.value <= 600;
+    // Sur mobile : quasi toute la largeur, et on réserve la hauteur du titre,
+    // des onglets, de la barre d'outils et de la palette pour tout garder sur un écran.
+    const availableWidth = screenWidth.value * (isMobile ? 0.96 : 0.7);
+    const availableHeight = isMobile
+        ? screenHeight.value - 300
+        : screenHeight.value * 0.6;
     const borderSpace = (size.value - 1) * 1;
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
     const maxCellSizeHeight = (availableHeight - borderSpace - 6) / size.value;
     const maxCellSize = Math.min(maxCellSizeWidth, maxCellSizeHeight);
-    return Math.max(20, Math.min(60, Math.floor(maxCellSize)));
+    return Math.max(18, Math.min(60, Math.floor(maxCellSize)));
 });
 
 const queenIconSize = computed(() =>
@@ -1208,6 +1212,7 @@ body,
     margin: 0;
     padding: 0;
     overflow: hidden;
+    overscroll-behavior: none;
     font-family: Arial, sans-serif;
 }
 </style>
@@ -1336,88 +1341,123 @@ body,
     }
 }
 
-@media (max-width: 900px) {
-    html,
-    body,
-    #app {
-        height: auto;
-        min-height: 100dvh;
-        overflow-y: auto;
-    }
-
-    .app {
-        height: auto;
-        min-height: 100dvh;
-        overflow-y: auto;
-    }
-}
-
+/* ===== MOBILE : tout sur un seul écran, aucun scroll ===== */
 @media (max-width: 600px) {
     .app {
-        padding: 0.5vh 0.5vw;
+        padding: 0.4vh 2vw;
+        overflow: hidden;
+        justify-content: flex-start;
     }
 
     .title {
-        font-size: 1.5rem;
-        margin-bottom: 1vh;
+        font-size: 1.1rem;
+        margin: 0.3vh 0;
     }
 
-    .main-layout {
+    .view-tabs {
+        margin-bottom: 0.4vh;
+    }
+
+    /* Historique masqué sur mobile pour tenir sur un écran */
+    .history-slot,
+    .toggle-history-btn {
+        display: none !important;
+    }
+
+    .main-layout,
+    .main-layout.history-hidden {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
         width: 100%;
-        gap: 1vw;
-        height: auto;
-        max-height: none;
+        gap: 0.6vh;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .grid-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        justify-content: flex-start;
+        gap: 0.6vh;
+        overflow: hidden;
+    }
+
+    .grid-toolbar {
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Palette = carte compacte et lisible, non scrollable */
+    .sidebar {
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .size-selector {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .size-selector select {
+        width: auto;
+        min-width: 0;
     }
 
     .palette {
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(6, 1fr);
+        grid-template-columns: repeat(6, 1fr);
+        grid-auto-rows: 1fr;
         gap: 8px;
-        padding: 15px;
-        max-height: none;
+        padding: 8px;
+        width: 100%;
+        overflow: visible;
     }
 
     .color-btn {
-        width: 40px;
-        height: 40px;
+        width: 100%;
+        max-width: 40px;
+        height: auto;
+        aspect-ratio: 1;
+        margin: 0 auto;
+        border-width: 2px;
+    }
+
+    .color-btn.selected {
+        animation: none;
+        transform: none;
+        outline: 3px solid #3b82f6;
+        outline-offset: 1px;
     }
 
     .solution-buttons {
         flex-direction: column;
         align-items: center;
     }
-
-    .sidebar {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 2vw;
-        padding: 2vw;
-    }
-
-    .size-selector {
-        flex: 0 0 auto;
-        min-width: 12vw;
-    }
-
-    .palette {
-        flex: 1;
-        min-width: 0;
-    }
 }
 
 @media (max-width: 480px) {
+    .title {
+        font-size: 1rem;
+    }
+
     .palette {
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(6, 1fr);
         gap: 6px;
-        padding: 10px;
-        max-height: none;
+        padding: 6px;
     }
 
     .color-btn {
-        width: 35px;
-        height: 35px;
+        max-width: 34px;
     }
 }
 
@@ -1561,6 +1601,7 @@ body,
     overflow: hidden;
     flex-shrink: 0;
     min-width: 0;
+    touch-action: none;
 }
 
 .cell {
