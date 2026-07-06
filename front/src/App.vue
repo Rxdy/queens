@@ -27,6 +27,7 @@ const historyVisible = ref(true);
 const trmPerformance = ref(null);
 const baselineResult = ref(null);
 const isBenchmarking = ref(false);
+const isSolving = ref(false);
 const benchmarkStatus = ref("");
 const isImportModalOpen = ref(false);
 const importModalRef = ref(null);
@@ -378,6 +379,7 @@ const submit = async () => {
 
     trmPerformance.value = null;
     baselineResult.value = null;
+    isSolving.value = true;
 
     const trmPromise = axios.post(`${TRM_BASE}/api/solve`, payload);
     const baselinePromise = axios.post(`${BASELINE_BASE}/api/solve`, payload);
@@ -419,7 +421,8 @@ const submit = async () => {
             "Erreur lors de la résolution. Vérifiez que le serveur backend fonctionne.";
     }
 
-    baselinePromise.then((baselineRes) => {
+    try {
+        const baselineRes = await baselinePromise;
         baselineResult.value = baselineRes.data;
         const perf = baselineRes.data?.performance;
         if (historyEntry && perf) {
@@ -427,7 +430,11 @@ const submit = async () => {
             historyEntry.baselineValid = perf.valid ?? false;
             historyEntry.baselineSolutionsCount = perf.solutions_count ?? 0;
         }
-    }).catch(() => { /* baseline optionnel */ });
+    } catch {
+        /* baseline optionnel */
+    } finally {
+        isSolving.value = false;
+    }
 };
 
 const isGridComplete = computed(() => {
@@ -976,12 +983,15 @@ defineExpose({
                         </button>
                         <button
                             @click="submit"
-                            :disabled="!isGridComplete || isViewingHistory"
+                            :disabled="!isGridComplete || isViewingHistory || isSolving"
                             class="icon-btn solve-icon-btn"
                             :title="isGridComplete ? 'Résoudre' : `${emptyCellsCount} case${emptyCellsCount > 1 ? 's' : ''} vide${emptyCellsCount > 1 ? 's' : ''}`"
                             :aria-label="isGridComplete ? 'Résoudre' : `${emptyCellsCount} case${emptyCellsCount > 1 ? 's' : ''} vide${emptyCellsCount > 1 ? 's' : ''}`"
                         >
-                            <i class="ri-check-line" aria-hidden="true"></i>
+                            <i
+                                :class="isSolving ? 'ri-loader-4-line spin' : 'ri-check-line'"
+                                aria-hidden="true"
+                            ></i>
                         </button>
                         <button
                             @click="resetGrid"
@@ -1241,6 +1251,17 @@ defineExpose({
             @apply="onMatrixApplied"
             @close="closeImportModal"
         />
+
+        <!-- Loader de résolution : montre que les solveurs réfléchissent -->
+        <div v-if="isSolving" class="solving-overlay" role="status" aria-live="polite">
+            <div class="solving-card">
+                <div class="solving-spinner"></div>
+                <p class="solving-title">Résolution en cours…</p>
+                <p class="solving-sub">
+                    Les deux solveurs explorent la grille{{ size >= 11 ? " — les grandes grilles peuvent prendre quelques secondes" : "" }}.
+                </p>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -1939,6 +1960,63 @@ body,
     color: #666;
     margin-left: 1vw;
     align-self: center;
+}
+
+/* ===== Loader de résolution ===== */
+.solving-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 24, 40, 0.55);
+    backdrop-filter: blur(2px);
+    padding: 1rem;
+}
+
+.solving-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.6rem 2rem;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    max-width: 320px;
+}
+
+.solving-spinner {
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 1rem;
+    border: 5px solid #e3e8f0;
+    border-top-color: #1565c0;
+    border-radius: 50%;
+    animation: solving-spin 0.8s linear infinite;
+}
+
+.solving-title {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a2b4a;
+}
+
+.solving-sub {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #667085;
+    line-height: 1.4;
+}
+
+.spin {
+    display: inline-block;
+    animation: solving-spin 0.8s linear infinite;
+}
+
+@keyframes solving-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ============================================================
