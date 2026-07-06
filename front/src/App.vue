@@ -1355,141 +1355,6 @@ body,
     }
 }
 
-/* ===== MOBILE : grille à gauche + bande palette fine à droite, un seul écran ===== */
-.mobile-size-selector {
-    display: none;
-}
-
-@media (max-width: 600px) {
-    .app {
-        padding: 0.4vh 2vw;
-        overflow: hidden;
-        justify-content: flex-start;
-    }
-
-    .title {
-        font-size: 1.05rem;
-        margin: 0.2vh 0;
-    }
-
-    .view-tabs {
-        margin-bottom: 0.4vh;
-    }
-
-    /* Historique masqué sur mobile pour tenir sur un écran */
-    .history-slot,
-    .toggle-history-btn {
-        display: none !important;
-    }
-
-    /* Grille | palette côte à côte */
-    .main-layout,
-    .main-layout.history-hidden {
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        justify-content: center;
-        flex: 1;
-        min-height: 0;
-        width: 100%;
-        gap: 2vw;
-        padding: 0;
-        overflow: hidden;
-    }
-
-    .grid-container {
-        flex: 1 1 auto;
-        min-width: 0;
-        min-height: 0;
-        justify-content: flex-start;
-        gap: 0.5vh;
-        overflow: hidden;
-    }
-
-    .grid-toolbar {
-        gap: 5px;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    /* Sélecteur de taille compact, en haut sous la barre d'outils */
-    .mobile-size-selector {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 0.4vh;
-        font-size: 0.85rem;
-    }
-
-    .mobile-size-selector label {
-        font-weight: 600;
-        color: #333;
-    }
-
-    .mobile-size-selector select {
-        padding: 3px 8px;
-        border-radius: 6px;
-        border: 2px solid #333;
-        background: #f9f9f9;
-        font-size: 0.9rem;
-    }
-
-    /* Bande palette fine, verticale, à droite */
-    .sidebar {
-        flex: 0 0 auto;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        width: auto;
-        min-width: 0;
-        gap: 0;
-        padding: 6px 5px;
-        border-radius: 12px;
-    }
-
-    /* Le sélecteur de taille n'est plus dans la bande palette sur mobile */
-    .sidebar .size-selector {
-        display: none;
-    }
-
-    .palette {
-        display: flex;
-        flex-direction: column;
-        flex-wrap: nowrap;
-        justify-content: center;
-        gap: 5px;
-        height: 100%;
-        width: auto;
-        padding: 0;
-        background: none;
-        box-shadow: none;
-        overflow: visible;
-    }
-
-    .color-btn {
-        flex: 1 1 0;
-        width: auto;
-        height: auto;
-        max-height: 34px;
-        aspect-ratio: 1;
-        margin: 0;
-        border-width: 2px;
-    }
-
-    .color-btn.selected {
-        animation: none;
-        transform: none;
-        outline: 3px solid #3b82f6;
-        outline-offset: 1px;
-    }
-
-    .solution-buttons {
-        flex-direction: column;
-        align-items: center;
-    }
-}
-
 @media (max-width: 400px) {
     .queen-icon {
         width: 18px;
@@ -2049,5 +1914,164 @@ body,
     color: #666;
     margin-left: 1vw;
     align-self: center;
+}
+
+/* ============================================================
+   MOBILE — placé en dernier pour l'emporter sur les règles de
+   base (même spécificité => l'ordre source décide).
+   Disposition : grille à gauche + bande palette fine à droite.
+   ============================================================ */
+.mobile-size-selector {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .app {
+        padding: 0.4vh 2vw;
+        overflow: hidden;
+        justify-content: flex-start;
+    }
+
+    .title {
+        font-size: 1.05rem;
+        margin: 0.2vh 0;
+    }
+
+    .view-tabs {
+        margin-bottom: 0.4vh;
+    }
+
+    /* Historique masqué sur mobile pour tenir sur un écran */
+    .history-slot,
+    .toggle-history-btn {
+        display: none !important;
+    }
+
+    /* Grille | palette côte à côte */
+    .main-layout,
+    .main-layout.history-hidden {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        justify-content: center;
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        gap: 2vw;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .grid-container {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 0;
+        justify-content: flex-start;
+        gap: 0.5vh;
+        overflow: hidden;
+    }
+
+    /* Barre d'outils compacte : rangée horizontale qui reste en haut */
+    .grid-header {
+        width: 100%;
+    }
+
+    .grid-toolbar {
+        display: flex;
+        flex-flow: row wrap;
+        gap: 5px;
+        justify-content: center;
+    }
+
+    .grid-toolbar .icon-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.9rem;
+    }
+
+    /* Sélecteur de taille compact, en haut sous la barre d'outils */
+    .mobile-size-selector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 0.4vh;
+        font-size: 0.85rem;
+    }
+
+    .mobile-size-selector label {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .mobile-size-selector select {
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 2px solid #333;
+        background: #f9f9f9;
+        font-size: 0.9rem;
+    }
+
+    /* Bande palette fine, verticale, à droite */
+    .sidebar {
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        min-width: 0;
+        gap: 0;
+        padding: 6px 5px;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Le sélecteur de taille n'est plus dans la bande palette sur mobile */
+    .sidebar .size-selector {
+        display: none;
+    }
+
+    .palette {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 5px;
+        height: 100%;
+        width: auto;
+        padding: 0;
+        background: none;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .color-btn {
+        flex: 0 1 auto;
+        width: 30px;
+        height: 30px;
+        max-height: 34px;
+        aspect-ratio: 1;
+        margin: 0;
+        border-width: 2px;
+    }
+
+    .color-btn.selected {
+        animation: none;
+        transform: none;
+        outline: 3px solid #3b82f6;
+        outline-offset: 1px;
+    }
+
+    .solution-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+@media (max-width: 380px) {
+    .color-btn {
+        width: 26px;
+        height: 26px;
+    }
 }
 </style>
