@@ -19,7 +19,7 @@ const emit = defineEmits(["close"]);
             <h3>{{ mode === 'welcome' ? 'Bienvenue dans le solveur' : 'Aide' }}</h3>
 
             <div class="game-intro">
-                <h4>🎯 Qu'est-ce que le jeu des Reines&nbsp;?</h4>
+                <h4>Qu'est-ce que le jeu des Reines&nbsp;?</h4>
                 <p>
                     Le plateau est un carré divisé en <strong>zones colorées</strong> (une couleur = une région).
                     Le but est de placer <strong>exactement une reine par zone</strong>, en respectant ces règles&nbsp;:
