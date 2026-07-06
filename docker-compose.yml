@@ -1,5 +1,6 @@
 services:
     queens:
+        image: ghcr.io/rxdy/queens-queens:latest
         build: ./front
         ports:
             - "5173:80"
@@ -23,6 +24,7 @@ services:
             - default
 
     trm-solveur:
+        image: ghcr.io/rxdy/queens-trm-solveur:latest
         build: ./TRM
         ports:
             - "8000:8000"
@@ -35,6 +37,7 @@ services:
             start_period: 30s
 
     baseline-solveur:
+        image: ghcr.io/rxdy/queens-baseline-solveur:latest
         build: ./baseline-8queens
         ports:
             - "8001:8001"
