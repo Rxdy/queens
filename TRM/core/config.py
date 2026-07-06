@@ -1,6 +1,7 @@
 """
 Configuration de l'application TRM Solver
 """
+
 import os
 
 # Configuration du serveur

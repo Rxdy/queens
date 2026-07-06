@@ -1,13 +1,16 @@
 """
 Tests d'intégration des routes API TRM via httpx.
 """
-import pytest
-import sys
+
 import os
+import sys
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from app import app
 
 TRANSPORT = ASGITransport(app=app)

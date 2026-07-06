@@ -12,7 +12,7 @@ Optimisations par rapport au baseline naïf :
      lignes restantes — au lieu de O(n²) boucles imbriquées dans le baseline.
   4. Masque d'adjacence calculé en O(1) par nœud.
 """
-from typing import List, Tuple
+
 import logging
 
 logger = logging.getLogger("trm_solver")
@@ -23,10 +23,10 @@ class QueensSolver:
     Solveur N-Reines par backtracking avec bitsets + forward-checking.
     """
 
-    def __init__(self, max_iterations: int = 10 ** 18):
+    def __init__(self, max_iterations: int = 10**18):
         self.max_iterations = max_iterations
 
-    def solve(self, size: int, zones: List[List[int]]) -> Tuple[List[List[List[int]]], int]:
+    def solve(self, size: int, zones: list[list[int]]) -> tuple[list[list[list[int]]], int]:
         """
         Résout le problème des Queens avec contraintes de zones.
 
@@ -40,19 +40,21 @@ class QueensSolver:
 
         # ── Pré-calcul des masques de zones ───────────────────────────────
         # row_zone_mask[r][z] = bitset des colonnes de zone z dans ligne r
-        row_zone_mask: List[List[int]] = []
+        row_zone_mask: list[list[int]] = []
         for r in range(n):
             rz = [0] * n
             for c in range(n):
-                rz[zones[r][c]] |= (1 << c)
+                rz[zones[r][c]] |= 1 << c
             row_zone_mask.append(rz)
 
         # adj_mask[col] = masque excluant col-1, col, col+1
         adj_mask = [0] * n
         for c in range(n):
             forbidden = 1 << c
-            if c > 0:     forbidden |= 1 << (c - 1)
-            if c < n - 1: forbidden |= 1 << (c + 1)
+            if c > 0:
+                forbidden |= 1 << (c - 1)
+            if c < n - 1:
+                forbidden |= 1 << (c + 1)
             adj_mask[c] = ALL ^ forbidden
 
         placement = [-1] * n
@@ -96,7 +98,7 @@ class QueensSolver:
                 d ^= lsb
 
                 z = zones[row][col]
-                new_free_cols  = free_cols  ^ lsb
+                new_free_cols = free_cols ^ lsb
                 new_free_zones = free_zones ^ (1 << z)
 
                 # ── Forward-checking multi-lignes ─────────────────────────

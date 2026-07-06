@@ -1,10 +1,10 @@
 """
 Tests unitaires pour QueensSolver (TRM).
 """
+
 import concurrent.futures
-import pytest
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from core.solver import QueensSolver
@@ -33,7 +33,7 @@ def is_valid_solution(solution, size, zones):
     if len(solution) != size:
         return False
 
-    cols   = [pos[1] for pos in solution]
+    cols = [pos[1] for pos in solution]
     z_used = [zones[pos[0]][pos[1]] for pos in solution]
 
     # 1 reine par colonne
@@ -47,14 +47,14 @@ def is_valid_solution(solution, size, zones):
     # Aucune adjacence (orthogonale ou diagonale)
     for i in range(len(solution)):
         for j in range(i + 1, len(solution)):
-            if max(abs(solution[i][0] - solution[j][0]),
-                   abs(solution[i][1] - solution[j][1])) <= 1:
+            if max(abs(solution[i][0] - solution[j][0]), abs(solution[i][1] - solution[j][1])) <= 1:
                 return False
 
     return True
 
 
 # ── Tests unitaires du solveur ──────────────────────────────────────────────
+
 
 class TestQueensSolverBasic:
     def test_solve_4x4_returns_solutions(self):

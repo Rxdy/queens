@@ -1,13 +1,13 @@
 """
 Modèles Pydantic pour l'API Baseline Solver
 """
+
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
 
 class GridInput(BaseModel):
     size: int = Field(..., description="Taille de la grille (size x size)", ge=1)
-    zones: List[List[int]] = Field(..., description="Grille des zones (matrice size x size)")
+    zones: list[list[int]] = Field(..., description="Grille des zones (matrice size x size)")
 
 
 class BaselinePerformance(BaseModel):
@@ -19,7 +19,9 @@ class BaselinePerformance(BaseModel):
 
 class BaselineSolution(BaseModel):
     supported: bool = Field(..., description="La taille de grille est-elle supportée?")
-    solution: Optional[List[List[int]]] = Field(None, description="Première solution [[row, col], ...]")
-    solutions: Optional[List[List[List[int]]]] = Field(None, description="Toutes les solutions")
-    performance: Optional[BaselinePerformance] = None
-    error: Optional[str] = None
+    solution: list[list[int]] | None = Field(
+        None, description="Première solution [[row, col], ...]"
+    )
+    solutions: list[list[list[int]]] | None = Field(None, description="Toutes les solutions")
+    performance: BaselinePerformance | None = None
+    error: str | None = None

@@ -1,7 +1,6 @@
 """
 Modèle baseline — backtracking naïf exhaustif pour le problème des N-Reines.
 """
-from typing import List
 
 
 class QueensGreedyBaseline:
@@ -35,7 +34,9 @@ class QueensGreedyBaseline:
             for col in range(n):
                 if used_cols[col]:
                     continue
-                zone = zones[row][col] if zones and row < len(zones) and col < len(zones[row]) else -1
+                zone = (
+                    zones[row][col] if zones and row < len(zones) and col < len(zones[row]) else -1
+                )
                 if zone != -1 and zone in used_zones:
                     continue
                 # Contrainte d'adjacence naïve : vérifie toutes les lignes précédentes (O(n))

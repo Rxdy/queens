@@ -1,6 +1,7 @@
 """
 Configuration du logging pour TRM Solver
 """
+
 import logging
 import sys
 
@@ -8,16 +9,16 @@ import sys
 def setup_logging(log_level: str = "INFO") -> logging.Logger:
     """
     Configure et retourne un logger pour l'application
-    
+
     Args:
         log_level: Niveau de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    
+
     Returns:
         Logger configuré
     """
     # Configuration du format des logs
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     logger = logging.getLogger("trm_solver")
 
     if logger.hasHandlers():
