@@ -34,6 +34,8 @@ const showWelcomeModal = ref(true);
 const showHelpModal = ref(false);
 
 const isMobile = computed(() => screenWidth.value < 600);
+// Nombre de solutions visualisables : 3 max sur mobile, 5 sur desktop.
+const maxSolButtons = computed(() => (screenWidth.value <= 600 ? 3 : 5));
 const currentSolutionIndex = ref(0);
 const isPainting = ref(false);
 const currentMouseButton = ref(null);
@@ -783,8 +785,14 @@ const cellSize = computed(() => {
     const paletteStrip = isMobile ? 56 : 0;
     const availableWidth =
         screenWidth.value * (isMobile ? 0.96 : 0.7) - paletteStrip;
+    // Quand un résultat s'affiche (solutions + stats des 2 modèles), on réduit la
+    // grille sur mobile pour laisser la place au panneau de résultats sans scroll.
+    const hasResults =
+        solutions.value.length > 0 ||
+        trmPerformance.value !== null ||
+        baselineResult.value !== null;
     const availableHeight = isMobile
-        ? screenHeight.value - 200
+        ? screenHeight.value - (hasResults ? 360 : 200)
         : screenHeight.value * 0.6;
     const borderSpace = (size.value - 1) * 1;
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
@@ -1117,7 +1125,7 @@ defineExpose({
                     </p>
                     <div v-if="solutions.length > 1" class="solution-buttons">
                         <button
-                            v-for="(_, idx) in solutions.slice(0, 5)"
+                            v-for="(_, idx) in solutions.slice(0, maxSolButtons)"
                             :key="idx"
                             @click="loadSolution(idx)"
                             class="solution-btn"
@@ -1125,8 +1133,8 @@ defineExpose({
                         >
                             Solution {{ idx + 1 }}
                         </button>
-                        <span v-if="solutions.length > 5" class="more-solutions"
-                            >... et {{ solutions.length - 5 }} autres</span
+                        <span v-if="solutions.length > maxSolButtons" class="more-solutions"
+                            >... et {{ solutions.length - maxSolButtons }} autres</span
                         >
                     </div>
                 </div>
@@ -2109,9 +2117,77 @@ body,
         outline-offset: 1px;
     }
 
+    /* Résultats sous la grille : compacts pour rester sur un écran */
+    .grid-container {
+        overflow: visible;
+    }
+
+    .solutions-info {
+        margin-top: 0.6vh;
+        width: 100%;
+    }
+
+    .solutions-info p {
+        margin: 0 0 4px 0;
+        font-size: 0.85rem;
+    }
+
     .solution-buttons {
-        flex-direction: column;
-        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+    }
+
+    .solution-btn {
+        padding: 4px 8px;
+        font-size: 0.78rem;
+    }
+
+    .more-solutions {
+        font-size: 0.78rem;
+        margin-left: 0;
+    }
+
+    /* Stats des 2 modèles : panneau compact pleine largeur */
+    .comparison-panel {
+        margin-top: 0.6vh;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 10px;
+    }
+
+    .comparison-title {
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+    }
+
+    .comparison-row {
+        gap: 6px;
+        font-size: 0.75rem;
+    }
+
+    .model-label {
+        flex: 1 1 auto;
+        min-width: 0;
+        white-space: normal;
+        font-size: 0.72rem;
+        line-height: 1.2;
+    }
+
+    .model-time {
+        flex: 0 0 auto;
+        font-size: 0.72rem;
+    }
+
+    .model-badge {
+        flex: 0 0 auto;
+        font-size: 0.68rem;
+    }
+
+    .speedup-info {
+        font-size: 0.72rem;
     }
 }
 
