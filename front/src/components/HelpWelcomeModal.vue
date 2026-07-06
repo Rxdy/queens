@@ -17,6 +17,28 @@ const emit = defineEmits(["close"]);
     <div v-if="modelValue" class="modal-overlay" @click.self="emit('close')">
         <div class="modal-window welcome-window">
             <h3>{{ mode === 'welcome' ? 'Bienvenue dans le solveur' : 'Aide' }}</h3>
+
+            <div class="game-intro">
+                <h4>🎯 Qu'est-ce que le jeu des Reines&nbsp;?</h4>
+                <p>
+                    Le plateau est un carré divisé en <strong>zones colorées</strong> (une couleur = une région).
+                    Le but est de placer <strong>exactement une reine par zone</strong>, en respectant ces règles&nbsp;:
+                </p>
+                <ul class="rules-list">
+                    <li><strong>Une seule reine par ligne</strong></li>
+                    <li><strong>Une seule reine par colonne</strong></li>
+                    <li><strong>Une seule reine par zone de couleur</strong></li>
+                    <li>
+                        <strong>Deux reines ne peuvent jamais se toucher</strong> —
+                        ni côte à côte, ni en diagonale (aucune case adjacente).
+                    </li>
+                </ul>
+                <p class="game-role">
+                    Dans cette application, votre rôle est de <strong>dessiner les zones colorées</strong> de la grille&nbsp;;
+                    le solveur se charge ensuite de trouver <strong>tous les placements de reines valides</strong>.
+                </p>
+            </div>
+
             <p class="welcome-intro">
                 Ce guide vous aide à démarrer : colorier les zones, choisir la taille,
                 utiliser les boutons, consulter l'historique et importer une grille par matrice ou photo.
@@ -274,6 +296,47 @@ const emit = defineEmits(["close"]);
     margin-bottom: 1rem;
     color: #444;
     font-size: 0.98rem;
+}
+
+.game-intro {
+    margin-bottom: 1.2rem;
+    padding: 1rem 1.2rem;
+    background: linear-gradient(135deg, #eef4ff 0%, #f6f0ff 100%);
+    border: 1px solid #d6e0f5;
+    border-radius: 14px;
+}
+
+.game-intro h4 {
+    margin: 0 0 0.6rem 0;
+    font-size: 1.05rem;
+    color: #1a2b4a;
+}
+
+.game-intro p {
+    margin: 0;
+    color: #3a3a3a;
+    line-height: 1.55;
+    font-size: 0.95rem;
+}
+
+.game-intro .rules-list {
+    margin: 0.7rem 0;
+    padding-left: 1.2rem;
+    color: #3a3a3a;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.game-intro .rules-list li {
+    margin-bottom: 0.4rem;
+}
+
+.game-intro .game-role {
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid #d6e0f5;
+    font-size: 0.92rem;
+    color: #4a4a4a;
 }
 
 .welcome-section {
