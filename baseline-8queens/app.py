@@ -1,16 +1,18 @@
 """
 Baseline Queens Solver API - Modèle heuristique léger (sans PyTorch)
 """
+
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from api.routes import router
 from api.limiter import limiter
+from api.routes import router
 
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
@@ -38,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -152,6 +155,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         app,
         host="0.0.0.0",

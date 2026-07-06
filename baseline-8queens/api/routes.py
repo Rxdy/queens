@@ -1,13 +1,15 @@
 """
 Routes API pour Baseline Solver (heuristique greedy + local search)
 """
+
 import asyncio
 import time
-from fastapi import APIRouter, Request
 from functools import partial
 
-from api.models import GridInput, BaselineSolution, BaselinePerformance
+from fastapi import APIRouter, Request
+
 from api.limiter import limiter
+from api.models import BaselinePerformance, BaselineSolution, GridInput
 from src.greedy_model import QueensGreedyBaseline
 
 router = APIRouter()

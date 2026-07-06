@@ -2,6 +2,15 @@
 line-length = 100
 target-version = "py311"
 src = ["TRM", "baseline-8queens"]
+# Scripts de recherche/entraînement ML (non servis par l'API) : hors périmètre lint.
+extend-exclude = [
+    "baseline-8queens/src/train.py",
+    "baseline-8queens/src/viz.py",
+    "baseline-8queens/src/viz_train.py",
+    "baseline-8queens/src/data.py",
+    "baseline-8queens/src/eval.py",
+    "baseline-8queens/src/metrics.py",
+]
 
 [tool.ruff.lint]
 select = [

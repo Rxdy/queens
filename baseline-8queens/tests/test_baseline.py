@@ -1,15 +1,18 @@
 """
 Tests unitaires et d'intégration pour le Baseline Solver.
 """
-import pytest
-import sys
+
 import os
+import sys
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from httpx import AsyncClient, ASGITransport
-from src.greedy_model import QueensGreedyBaseline
+from httpx import ASGITransport, AsyncClient
+
 from app import app
+from src.greedy_model import QueensGreedyBaseline
 
 TRANSPORT = ASGITransport(app=app)
 BASE = "http://test"
@@ -32,7 +35,7 @@ ZONES_4x4_IMPOSSIBLE = [
 def is_valid_solution(solution, size, zones):
     if len(solution) != size:
         return False
-    cols   = [pos[1] for pos in solution]
+    cols = [pos[1] for pos in solution]
     z_used = [zones[pos[0]][pos[1]] for pos in solution]
     if len(set(cols)) != size:
         return False
@@ -40,13 +43,13 @@ def is_valid_solution(solution, size, zones):
         return False
     for i in range(len(solution)):
         for j in range(i + 1, len(solution)):
-            if max(abs(solution[i][0] - solution[j][0]),
-                   abs(solution[i][1] - solution[j][1])) <= 1:
+            if max(abs(solution[i][0] - solution[j][0]), abs(solution[i][1] - solution[j][1])) <= 1:
                 return False
     return True
 
 
 # ── Tests unitaires du modèle ───────────────────────────────────────────────
+
 
 class TestQueensGreedyBaseline:
     def test_solve_4x4_returns_solution(self):
@@ -99,6 +102,7 @@ class TestQueensGreedyBaseline:
 
 
 # ── Tests d'intégration API ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 class TestBaselineHealth:

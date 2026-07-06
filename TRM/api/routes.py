@@ -1,16 +1,18 @@
 """
 Routes API pour TRM Solver
 """
+
 import asyncio
-from functools import partial
-from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 import logging
 import time
+from functools import partial
 
-from api.models import GridInput, Solution, PerformanceMetrics, ExtractedMatrix
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+
 from api.limiter import limiter
-from core.solver import QueensSolver
+from api.models import ExtractedMatrix, GridInput, PerformanceMetrics, Solution
 from core.config import MAX_ITERATIONS
+from core.solver import QueensSolver
 from utils.image_processor import extract_matrix_from_image
 
 logger = logging.getLogger("trm_solver")
@@ -40,14 +42,14 @@ async def solve(request: Request, grid: GridInput):
         if len(grid.zones) != grid.size:
             raise HTTPException(
                 status_code=400,
-                detail=f"La grille doit avoir {grid.size} lignes, reçu {len(grid.zones)}"
+                detail=f"La grille doit avoir {grid.size} lignes, reçu {len(grid.zones)}",
             )
 
         for i, row in enumerate(grid.zones):
             if len(row) != grid.size:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"La ligne {i} doit avoir {grid.size} colonnes, reçu {len(row)}"
+                    detail=f"La ligne {i} doit avoir {grid.size} colonnes, reçu {len(row)}",
                 )
 
         loop = asyncio.get_running_loop()
@@ -65,7 +67,7 @@ async def solve(request: Request, grid: GridInput):
             execution_time=execution_time,
             iterations=iterations,
             solutions_count=solutions_count,
-            solutions_per_second=solutions_per_second
+            solutions_per_second=solutions_per_second,
         )
 
         logger.info(f"✅ {solutions_count} solutions trouvées")
@@ -79,7 +81,7 @@ async def solve(request: Request, grid: GridInput):
         raise
     except Exception as e:
         logger.error(f"❌ Erreur lors de la résolution: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}") from e
 
 
 @router.post("/extract-matrix", response_model=ExtractedMatrix)
@@ -97,7 +99,7 @@ async def extract_matrix(file: UploadFile = File(...)):
         if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "image/gif"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Type de fichier non supporté: {file.content_type}. Utilisez PNG, JPG ou GIF."
+                detail=f"Type de fichier non supporté: {file.content_type}. Utilisez PNG, JPG ou GIF.",
             )
 
         image_data = await file.read()
@@ -113,23 +115,19 @@ async def extract_matrix(file: UploadFile = File(...)):
         logger.info(f"📊 Confiance: {result['confidence']:.2%}")
 
         return ExtractedMatrix(
-            size=result["size"],
-            zones=result["zones"],
-            confidence=result["confidence"]
+            size=result["size"], zones=result["zones"], confidence=result["confidence"]
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Erreur lors de l'extraction: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement de l'image: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erreur lors du traitement de l'image: {str(e)}"
+        ) from e
 
 
 @router.get("/health")
 async def health():
     """Point de santé de l'API"""
-    return {
-        "status": "healthy",
-        "service": "TRM Solver",
-        "max_iterations": MAX_ITERATIONS
-    }
+    return {"status": "healthy", "service": "TRM Solver", "max_iterations": MAX_ITERATIONS}

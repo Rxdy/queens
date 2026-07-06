@@ -8,16 +8,17 @@ Architecture Clean:
 """
 
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from api.routes import router as api_router
 from api.limiter import limiter
+from api.routes import router as api_router
+from core.config import CORS_ORIGINS, HOST, LOG_LEVEL, PORT
 from utils.logger import setup_logging
-from core.config import HOST, PORT, LOG_LEVEL, CORS_ORIGINS
 
 logger = setup_logging(LOG_LEVEL)
 
@@ -163,6 +164,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         app,
         host=HOST,
