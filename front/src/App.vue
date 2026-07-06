@@ -772,17 +772,19 @@ const toggleHistory = () => {
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
     const isMobile = screenWidth.value <= 600;
-    // Sur mobile : quasi toute la largeur, et on réserve la hauteur du titre,
-    // des onglets, de la barre d'outils et de la palette pour tout garder sur un écran.
-    const availableWidth = screenWidth.value * (isMobile ? 0.96 : 0.7);
+    // Mobile : grille à gauche + bande palette fine à droite. On réserve la largeur
+    // de la bande palette et la hauteur du titre/onglets/barre d'outils/sélecteur.
+    const paletteStrip = isMobile ? 56 : 0;
+    const availableWidth =
+        screenWidth.value * (isMobile ? 0.96 : 0.7) - paletteStrip;
     const availableHeight = isMobile
-        ? screenHeight.value - 300
+        ? screenHeight.value - 175
         : screenHeight.value * 0.6;
     const borderSpace = (size.value - 1) * 1;
     const maxCellSizeWidth = (availableWidth - borderSpace - 6) / size.value;
     const maxCellSizeHeight = (availableHeight - borderSpace - 6) / size.value;
     const maxCellSize = Math.min(maxCellSizeWidth, maxCellSizeHeight);
-    return Math.max(18, Math.min(60, Math.floor(maxCellSize)));
+    return Math.max(20, Math.min(60, Math.floor(maxCellSize)));
 });
 
 const queenIconSize = computed(() =>
@@ -1009,6 +1011,18 @@ defineExpose({
                         >
                             <i class="ri-question-line" aria-hidden="true"></i>
                         </button>
+                    </div>
+                    <div v-if="screenWidth <= 600" class="mobile-size-selector">
+                        <label>Taille</label>
+                        <select v-model.number="size" @change="initializeZones">
+                            <option
+                                v-for="s in [4, 5, 6, 7, 8, 9, 10, 11, 12]"
+                                :key="s"
+                                :value="s"
+                            >
+                                {{ s }}×{{ s }}
+                            </option>
+                        </select>
                     </div>
                     <div v-if="benchmarkStatus" class="benchmark-status header-status">
                         {{ benchmarkStatus }}
@@ -1341,7 +1355,11 @@ body,
     }
 }
 
-/* ===== MOBILE : tout sur un seul écran, aucun scroll ===== */
+/* ===== MOBILE : grille à gauche + bande palette fine à droite, un seul écran ===== */
+.mobile-size-selector {
+    display: none;
+}
+
 @media (max-width: 600px) {
     .app {
         padding: 0.4vh 2vw;
@@ -1350,8 +1368,8 @@ body,
     }
 
     .title {
-        font-size: 1.1rem;
-        margin: 0.3vh 0;
+        font-size: 1.05rem;
+        margin: 0.2vh 0;
     }
 
     .view-tabs {
@@ -1364,72 +1382,98 @@ body,
         display: none !important;
     }
 
+    /* Grille | palette côte à côte */
     .main-layout,
     .main-layout.history-hidden {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        align-items: stretch;
+        justify-content: center;
         flex: 1;
         min-height: 0;
         width: 100%;
-        gap: 0.6vh;
+        gap: 2vw;
         padding: 0;
         overflow: hidden;
     }
 
     .grid-container {
         flex: 1 1 auto;
+        min-width: 0;
         min-height: 0;
         justify-content: flex-start;
-        gap: 0.6vh;
+        gap: 0.5vh;
         overflow: hidden;
     }
 
     .grid-toolbar {
-        gap: 6px;
+        gap: 5px;
         flex-wrap: wrap;
         justify-content: center;
     }
 
-    /* Palette = carte compacte et lisible, non scrollable */
+    /* Sélecteur de taille compact, en haut sous la barre d'outils */
+    .mobile-size-selector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 0.4vh;
+        font-size: 0.85rem;
+    }
+
+    .mobile-size-selector label {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .mobile-size-selector select {
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 2px solid #333;
+        background: #f9f9f9;
+        font-size: 0.9rem;
+    }
+
+    /* Bande palette fine, verticale, à droite */
     .sidebar {
         flex: 0 0 auto;
         flex-direction: column;
-        align-items: stretch;
-        width: 100%;
-        max-width: none;
-        min-width: 0;
-        gap: 8px;
-        padding: 10px;
-    }
-
-    .size-selector {
-        flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        width: 100%;
-    }
-
-    .size-selector select {
         width: auto;
         min-width: 0;
+        gap: 0;
+        padding: 6px 5px;
+        border-radius: 12px;
+    }
+
+    /* Le sélecteur de taille n'est plus dans la bande palette sur mobile */
+    .sidebar .size-selector {
+        display: none;
     }
 
     .palette {
-        grid-template-columns: repeat(6, 1fr);
-        grid-auto-rows: 1fr;
-        gap: 8px;
-        padding: 8px;
-        width: 100%;
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 5px;
+        height: 100%;
+        width: auto;
+        padding: 0;
+        background: none;
+        box-shadow: none;
         overflow: visible;
     }
 
     .color-btn {
-        width: 100%;
-        max-width: 40px;
+        flex: 1 1 0;
+        width: auto;
         height: auto;
+        max-height: 34px;
         aspect-ratio: 1;
-        margin: 0 auto;
+        margin: 0;
         border-width: 2px;
     }
 
@@ -1443,21 +1487,6 @@ body,
     .solution-buttons {
         flex-direction: column;
         align-items: center;
-    }
-}
-
-@media (max-width: 480px) {
-    .title {
-        font-size: 1rem;
-    }
-
-    .palette {
-        gap: 6px;
-        padding: 6px;
-    }
-
-    .color-btn {
-        max-width: 34px;
     }
 }
 
