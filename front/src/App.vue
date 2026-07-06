@@ -925,7 +925,7 @@ defineExpose({
                 :class="{ active: currentView === 'game' }"
                 @click="currentView = 'game'"
             >
-                <i class="ri-grid-line" aria-hidden="true"></i> Jeu
+                <i class="ri-grid-line" aria-hidden="true"></i> Solveur
             </button>
             <button
                 v-if="screenWidth <= 600"
@@ -1218,6 +1218,15 @@ defineExpose({
                         :style="{ backgroundColor: colors[colorIndex] }"
                         @click="selectedColor = colorIndex"
                     ></div>
+                    <div
+                        class="color-btn eraser-btn"
+                        :class="{ selected: selectedColor === -1 }"
+                        @click="selectedColor = -1"
+                        title="Gomme — vide la case (tape ou glisse)"
+                        aria-label="Gomme : vide les cases"
+                    >
+                        <i class="ri-eraser-line" aria-hidden="true"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1896,6 +1905,21 @@ body,
     border-color: rgba(255, 255, 255, 1);
 }
 
+/* Gomme : pastille blanche avec icône, pour vider une case (surtout mobile) */
+.color-btn.eraser-btn {
+    background: #fff;
+    border: 3px dashed #b0b0b0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d32f2f;
+}
+
+.color-btn.eraser-btn i {
+    font-size: 22px;
+    line-height: 1;
+}
+
 .color-btn.selected {
     transform: translateY(-2px) scale(1.08);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -2186,6 +2210,10 @@ body,
         aspect-ratio: 1;
         margin: 0;
         border-width: 2px;
+    }
+
+    .color-btn.eraser-btn i {
+        font-size: 16px;
     }
 
     .color-btn.selected {
