@@ -1,0 +1,20 @@
+# Auto-déploiement en prod (Raspberry Pi).
+# Watchtower surveille GHCR et met à jour automatiquement les conteneurs queens
+# quand une nouvelle image :latest est publiée par le CI.
+#
+# À lancer UNIQUEMENT sur le Pi, en plus du stack principal :
+#   docker compose -f docker-compose.watchtower.yml up -d
+#
+# Il ne touche QUE les conteneurs portant le label
+# com.centurylinklabs.watchtower.enable=true (voir docker-compose.yml).
+services:
+    watchtower:
+        image: containrrr/watchtower
+        container_name: watchtower
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 300 --cleanup --label-enable
+        # --interval 300 : vérifie GHCR toutes les 5 min
+        # --cleanup      : supprime les anciennes images après mise à jour
+        # --label-enable : ne surveille que les conteneurs labellisés
