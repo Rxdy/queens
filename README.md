@@ -1,5 +1,7 @@
 # Queens Game Solver 🎯
 
+[![CI/CD](https://github.com/Rxdy/queens/actions/workflows/ci.yml/badge.svg)](https://github.com/Rxdy/queens/actions/workflows/ci.yml)
+
 Application interactive pour le **Problème des N-Reines**. Cette app compare deux types de modèles de résolution, tout en fournissant un vrai solveur de grille pour le jeu.
 
 Vous pouvez dessiner votre plateau, importer une image de grille de zones colorées, puis lancer la résolution et le benchmark des deux modèles.

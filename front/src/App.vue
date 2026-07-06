@@ -23,7 +23,6 @@ const selectedColor = ref(0);
 const errorMessage = ref("");
 const MAX_HISTORY = 100;
 const history = useLocalStorage("queens-history", []);
-const historyVisible = ref(true);
 const trmPerformance = ref(null);
 const baselineResult = ref(null);
 const isBenchmarking = ref(false);
@@ -34,7 +33,6 @@ const importModalRef = ref(null);
 const showWelcomeModal = ref(true);
 const showHelpModal = ref(false);
 
-const isMobile = computed(() => screenWidth.value < 600);
 // Nombre de solutions visualisables : 3 max sur mobile, 5 sur desktop.
 const maxSolButtons = computed(() => (screenWidth.value <= 600 ? 3 : 5));
 const currentSolutionIndex = ref(0);
@@ -780,10 +778,6 @@ const benchmarkAllSizes = async () => {
     }, 3000);
 };
 
-const toggleHistory = () => {
-    historyVisible.value = !historyVisible.value;
-};
-
 // Calculer la taille optimale des cases en fonction de l'écran disponible
 const cellSize = computed(() => {
     const isMobile = screenWidth.value <= 600;
@@ -871,22 +865,6 @@ onUnmounted(() => {
     window.removeEventListener("keydown", handleKeyDown);
 });
 
-const initializeHistoryVisibility = () => {
-    if (isMobile.value && historyVisible.value) {
-        historyVisible.value = false;
-    } else if (!isMobile.value && !historyVisible.value) {
-        historyVisible.value = true;
-    }
-};
-
-watch(isMobile, (newIsMobile) => {
-    if (newIsMobile && historyVisible.value) {
-        historyVisible.value = false;
-    } else if (!newIsMobile && !historyVisible.value) {
-        historyVisible.value = true;
-    }
-});
-
 watch(zones, () => {
     if (currentDraftIndex.value >= 0) {
         saveDraft();
@@ -894,7 +872,6 @@ watch(zones, () => {
 }, { deep: true });
 
 initializeZones();
-initializeHistoryVisibility();
 if (drafts.value.length === 0) {
     createNewDraft();
 }
@@ -928,7 +905,6 @@ defineExpose({
                 <i class="ri-grid-line" aria-hidden="true"></i> Solveur
             </button>
             <button
-                v-if="screenWidth <= 600"
                 class="view-tab"
                 :class="{ active: currentView === 'history' }"
                 @click="currentView = 'history'"
@@ -961,15 +937,7 @@ defineExpose({
             />
         </div>
 
-        <div v-if="currentView === 'game'" class="main-layout" :class="{ 'history-hidden': !historyVisible }">
-            <div class="history-slot">
-                <HistoryPanel
-                    :history="history"
-                    :visible="historyVisible"
-                    :selected-index="selectedHistoryIndex"
-                    @restore="toggleHistorySelection($event.entry, $event.index)"
-                />
-            </div>
+        <div v-if="currentView === 'game'" class="main-layout">
             <div class="grid-container">
                 <div class="grid-header">
                     <div class="grid-toolbar" role="toolbar" aria-label="Actions sur la grille">
@@ -1069,14 +1037,6 @@ defineExpose({
                     <div v-if="benchmarkStatus" class="benchmark-status header-status">
                         {{ benchmarkStatus }}
                     </div>
-                    <button
-                        v-if="screenWidth < 600"
-                        @click="toggleHistory"
-                        class="toggle-history-btn"
-                    >
-                        {{ historyVisible ? "Masquer" : "Afficher" }}
-                        l'historique
-                    </button>
                 </div>
                 <div
                     class="grid"
@@ -1219,6 +1179,7 @@ defineExpose({
                         @click="selectedColor = colorIndex"
                     ></div>
                     <div
+                        v-if="screenWidth <= 600"
                         class="color-btn eraser-btn"
                         :class="{ selected: selectedColor === -1 }"
                         @click="selectedColor = -1"
@@ -1355,7 +1316,7 @@ body,
 
 .main-layout {
     display: grid;
-    grid-template-columns: 20vw 1fr 18vw;
+    grid-template-columns: 1fr 18vw;
     justify-content: center;
     align-items: flex-start;
     gap: 2vw;
@@ -1368,22 +1329,22 @@ body,
     box-sizing: border-box;
 }
 
-.main-layout.history-hidden {
-    grid-template-columns: 0 1fr 18vw;
-}
-
-.main-layout.history-hidden .history-slot {
-    display: none;
+/* Vue Historique (onglet, tous appareils) */
+.history-view {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1vh 1vw;
+    box-sizing: border-box;
 }
 
 @media (max-width: 1200px) {
     .main-layout {
-        grid-template-columns: 20vw 1fr 18vw;
+        grid-template-columns: 1fr 18vw;
         gap: 2vw;
-    }
-
-    .main-layout.history-hidden {
-        grid-template-columns: 0 1fr 18vw;
     }
 }
 
@@ -1391,16 +1352,6 @@ body,
     .main-layout {
         grid-template-columns: 1fr;
         gap: 2vw;
-    }
-
-    .main-layout.history-hidden {
-        grid-template-columns: 1fr;
-    }
-
-    .history-slot {
-        order: -1;
-        max-width: none;
-        width: 100%;
     }
 
     .sidebar {
