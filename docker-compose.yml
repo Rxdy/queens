@@ -17,7 +17,8 @@ services:
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.queens.rule=Host(`queens.rxdy.fr`)"
-            - "traefik.http.routers.queens.entrypoints=web"
+            - "traefik.http.routers.queens.entrypoints=websecure"
+            - "traefik.http.routers.queens.tls.certresolver=leresolver"
             - "traefik.http.services.queens.loadbalancer.server.port=80"
             - "com.centurylinklabs.watchtower.enable=true"
         networks:
