@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMs } from '../utils/format.js'
+import { formatMs, formatDuration } from '../utils/format.js'
 
 describe('formatMs', () => {
   it('retourne — pour null', () => {
@@ -72,5 +72,24 @@ describe('formatMs', () => {
     it('formate 2100 ms → 2.10 s (garde .10)', () => {
       expect(formatMs(2100)).toBe('2.10 s')
     })
+  })
+})
+
+describe('formatDuration', () => {
+  it('retourne — pour null/undefined', () => {
+    expect(formatDuration(null)).toBe('—')
+    expect(formatDuration(undefined)).toBe('—')
+  })
+
+  it('formate moins d\'une minute en secondes', () => {
+    expect(formatDuration(15000)).toBe('15s')
+    expect(formatDuration(500)).toBe('1s')
+    expect(formatDuration(0)).toBe('0s')
+  })
+
+  it('formate au-delà d\'une minute en m/s', () => {
+    expect(formatDuration(90000)).toBe('1m 30s')
+    expect(formatDuration(60000)).toBe('1m 00s')
+    expect(formatDuration(125000)).toBe('2m 05s')
   })
 })

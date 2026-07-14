@@ -78,3 +78,74 @@ class ExtractedMatrix(BaseModel):
     size: int = Field(..., description="Taille de la grille détectée")
     zones: list[list[int]] = Field(..., description="Matrice de zones extraite")
     confidence: float = Field(..., description="Score de confiance de l'extraction (0-1)")
+
+
+class SizeStats(BaseModel):
+    """Statistiques agrégées (moyenne glissante) pour une taille de grille donnée"""
+
+    count: int = Field(..., description="Nombre de résolutions comptabilisées")
+    avg_execution_time: float = Field(..., description="Temps d'exécution moyen (secondes)")
+    min_execution_time: float | None = Field(
+        None, description="Temps d'exécution minimal (secondes)"
+    )
+    max_execution_time: float | None = Field(
+        None, description="Temps d'exécution maximal (secondes)"
+    )
+    avg_solutions_count: float = Field(..., description="Nombre moyen de solutions trouvées")
+
+
+class GlobalStats(BaseModel):
+    """Statistiques globales agrégées depuis la mise en service (pas de données par partie)"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "since": "2026-07-14T08:00:00+00:00",
+                "last_updated": "2026-07-14T20:00:00+00:00",
+                "total_solves": 128,
+                "overall": {
+                    "count": 128,
+                    "avg_execution_time": 0.0123,
+                    "min_execution_time": 0.0001,
+                    "max_execution_time": 0.512,
+                    "avg_solutions_count": 3.4,
+                },
+                "by_size": {
+                    "8": {
+                        "count": 40,
+                        "avg_execution_time": 0.0098,
+                        "min_execution_time": 0.0002,
+                        "max_execution_time": 0.041,
+                        "avg_solutions_count": 2.1,
+                    }
+                },
+            }
+        }
+    )
+
+    since: str = Field(..., description="Horodatage de la première résolution enregistrée")
+    last_updated: str = Field(..., description="Horodatage de la dernière mise à jour")
+    total_solves: int = Field(..., description="Nombre total de résolutions comptabilisées")
+    overall: SizeStats = Field(..., description="Statistiques toutes tailles confondues")
+    by_size: dict[str, SizeStats] = Field(..., description="Statistiques par taille de grille")
+
+
+class DailySolveInput(BaseModel):
+    """Signalement (anonyme) d'une résolution humaine d'une grille du défi quotidien"""
+
+    puzzle_day: str = Field(
+        ..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Jour du défi résolu (YYYY-MM-DD)"
+    )
+    size: int = Field(..., ge=1, description="Taille de la grille résolue")
+    time_ms: float = Field(
+        ..., ge=100, description="Temps de résolution en millisecondes (mesuré côté client)"
+    )
+
+
+class DailySizeStats(BaseModel):
+    """Statistiques agrégées du défi quotidien pour une taille donnée, un jour donné"""
+
+    count: int = Field(..., description="Nombre de résolutions humaines comptabilisées")
+    best_time_ms: float | None = Field(
+        None, description="Meilleur temps de résolution (millisecondes)"
+    )

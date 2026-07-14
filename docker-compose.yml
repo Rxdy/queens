@@ -30,6 +30,11 @@ services:
         build: ./TRM
         ports:
             - "8000:8000"
+        volumes:
+            # Stats globales agrégées (JSON) : doit survivre aux redéploiements
+            # automatiques de Watchtower, donc sur un volume nommé plutôt que
+            # dans la couche writable du conteneur.
+            - trm-stats:/app/data
         stop_grace_period: 1s
         labels:
             - "com.centurylinklabs.watchtower.enable=true"
@@ -59,3 +64,6 @@ networks:
     web:
         external: true
     default: {}
+
+volumes:
+    trm-stats:
