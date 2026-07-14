@@ -10,9 +10,10 @@ from functools import partial
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from api.limiter import limiter
-from api.models import ExtractedMatrix, GridInput, PerformanceMetrics, Solution
+from api.models import ExtractedMatrix, GlobalStats, GridInput, PerformanceMetrics, Solution
 from core.config import MAX_ITERATIONS
 from core.solver import QueensSolver
+from core.stats import get_stats, record_solve
 from utils.image_processor import extract_matrix_from_image
 
 logger = logging.getLogger("trm_solver")
@@ -75,6 +76,12 @@ async def solve(request: Request, grid: GridInput):
         logger.info(f"🔢 Itérations totales: {iterations}")
         logger.info(f"📈 Performance: {solutions_per_second:.2f} solutions/seconde")
 
+        try:
+            record_solve(grid.size, execution_time, solutions_count)
+        except Exception as e:
+            # Best-effort : un souci de stats ne doit jamais faire échouer la résolution.
+            logger.warning(f"⚠️ Échec de l'enregistrement des statistiques: {e}")
+
         return Solution(solutions=solutions, performance=performance)
 
     except HTTPException:
@@ -131,3 +138,14 @@ async def extract_matrix(file: UploadFile = File(...)):
 async def health():
     """Point de santé de l'API"""
     return {"status": "healthy", "service": "TRM Solver", "max_iterations": MAX_ITERATIONS}
+
+
+@router.get("/stats", response_model=GlobalStats)
+async def stats():
+    """
+    Statistiques globales agrégées depuis la mise en service.
+
+    Ne contient aucune donnée de partie individuelle : uniquement des
+    compteurs glissants (moyenne, min, max) par taille de grille.
+    """
+    return get_stats()

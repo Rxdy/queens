@@ -3,9 +3,14 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useLocalStorage } from "@vueuse/core";
 import axios from "axios";
 import BenchmarkChart from "./BenchmarkChart.vue";
+import GlobalStatsPanel from "./components/GlobalStatsPanel.vue";
 import HelpWelcomeModal from "./components/HelpWelcomeModal.vue";
 import HistoryPanel from "./components/HistoryPanel.vue";
 import ImportModal from "./components/ImportModal.vue";
+import QueenIcon from "./components/QueenIcon.vue";
+import DailyChallengePanel from "./components/daily/DailyChallengePanel.vue";
+import { colors } from "./utils/colors.js";
+import { generateRandomConnectedPattern } from "./utils/generateZones.js";
 
 const TRM_BASE = import.meta.env.VITE_TRM_API_BASE ?? "";
 const BASELINE_BASE = import.meta.env.VITE_BASELINE_API_BASE ?? "";
@@ -50,21 +55,6 @@ const MAX_DRAFTS = 15;
 // Dimensions de l'écran réactives
 const screenWidth = ref(1200);
 const screenHeight = ref(800);
-
-const colors = [
-    "rgb(223, 160, 191)",
-    "rgb(150, 190, 255)",
-    "rgb(255, 201, 146)",
-    "rgb(187, 163, 226)",
-    "rgb(240, 240, 240)",
-    "rgb(139, 69, 19)",
-    "rgb(255, 123, 96)",
-    "rgb(230, 243, 136)",
-    "rgb(179, 223, 160)",
-    "rgb(85, 235, 226)",
-    "rgb(149, 203, 207)",
-    "rgb(210, 180, 200)",
-];
 
 // Couleurs disponibles et leurs indices
 const availableColorIndices = computed(() => {
@@ -633,94 +623,6 @@ const restoreFromHistory = (payload) => {
     currentView.value = "game";
 };
 
-// Génère N zones connexes aléatoires couvrant toutes les cellules (règle du jeu).
-// Algorithme : croissance régionale depuis N graines aléatoires (flood-fill)
-// → garantit que chaque zone est d'un seul tenant.
-const generateRandomConnectedPattern = (size) => {
-    const zones = Array.from({ length: size }, () => Array(size).fill(-1));
-    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-    const shuffle = arr => {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
-    };
-
-    const seeds = [];
-    const minSep = Math.max(1, Math.floor(size / Math.sqrt(size)));
-    for (let color = 0; color < size; color++) {
-        let placed = false;
-        for (let attempt = 0; attempt < 400 && !placed; attempt++) {
-            const r = Math.floor(Math.random() * size);
-            const c = Math.floor(Math.random() * size);
-            if (zones[r][c] !== -1) continue;
-            const tooClose = seeds.some(([sr, sc]) => Math.abs(r - sr) + Math.abs(c - sc) < minSep);
-            if (!tooClose) {
-                zones[r][c] = color;
-                seeds.push([r, c]);
-                placed = true;
-            }
-        }
-        if (!placed) {
-            outer: for (let r = 0; r < size; r++)
-                for (let c = 0; c < size; c++)
-                    if (zones[r][c] === -1) { zones[r][c] = color; seeds.push([r, c]); placed = true; break outer; }
-        }
-    }
-
-    const frontiers = seeds.map(([r, c]) => [[r, c]]);
-    let remaining = size * size - size;
-    let guard = size * size * 10;
-
-    while (remaining > 0 && guard-- > 0) {
-        const colorOrder = shuffle(Array.from({ length: size }, (_, i) => i));
-        for (const color of colorOrder) {
-            if (remaining <= 0) break;
-            const frontier = frontiers[color];
-            if (frontier.length === 0) continue;
-            const fi = Math.floor(Math.random() * frontier.length);
-            const [r, c] = frontier[fi];
-            const sdirs = shuffle([...dirs]);
-            let expanded = false;
-            for (const [dr, dc] of sdirs) {
-                const nr = r + dr, nc = c + dc;
-                if (nr >= 0 && nr < size && nc >= 0 && nc < size && zones[nr][nc] === -1) {
-                    zones[nr][nc] = color;
-                    frontier.push([nr, nc]);
-                    remaining--;
-                    expanded = true;
-                    break;
-                }
-            }
-            if (!expanded) frontier.splice(fi, 1);
-        }
-    }
-
-    for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-            if (zones[r][c] !== -1) continue;
-            let best = 0, bestDist = Infinity;
-            for (let rr = 0; rr < size; rr++)
-                for (let cc = 0; cc < size; cc++)
-                    if (zones[rr][cc] !== -1) {
-                        const d = Math.abs(r - rr) + Math.abs(c - cc);
-                        if (d < bestDist) { bestDist = d; best = zones[rr][cc]; }
-                    }
-            zones[r][c] = best;
-        }
-    }
-
-    const usedColors = new Set(zones.flat());
-    if (usedColors.size !== size) {
-        for (let r = 0; r < size; r++)
-            for (let c = 0; c < size; c++)
-                zones[r][c] = r;
-    }
-
-    return zones;
-};
-
 const benchmarkAllSizes = async () => {
     isBenchmarking.value = true;
     benchmarkStatus.value = "Lancement du benchmark...";
@@ -899,6 +801,13 @@ defineExpose({
         <nav class="view-tabs">
             <button
                 class="view-tab"
+                :class="{ active: currentView === 'daily' }"
+                @click="currentView = 'daily'"
+            >
+                <i class="ri-gamepad-line" aria-hidden="true"></i> Jeu
+            </button>
+            <button
+                class="view-tab"
                 :class="{ active: currentView === 'game' }"
                 @click="currentView = 'game'"
             >
@@ -926,7 +835,10 @@ defineExpose({
             @close="closeCurrentModal"
         />
 
-        <BenchmarkChart v-if="currentView === 'stats'" :history="history" />
+        <template v-if="currentView === 'stats'">
+            <GlobalStatsPanel :trm-base="TRM_BASE" />
+            <BenchmarkChart :history="history" />
+        </template>
 
         <div v-if="currentView === 'history'" class="history-view">
             <HistoryPanel
@@ -937,10 +849,11 @@ defineExpose({
             />
         </div>
 
+        <DailyChallengePanel v-if="currentView === 'daily'" />
+
         <div v-if="currentView === 'game'" class="main-layout">
-            <div class="grid-container">
-                <div class="grid-header">
-                    <div class="grid-toolbar" role="toolbar" aria-label="Actions sur la grille">
+            <div class="actions-sidebar">
+                <div class="grid-toolbar" role="toolbar" aria-label="Actions sur la grille">
                         <button
                             @click="clearForNewGrid"
                             class="icon-btn new-icon-btn"
@@ -1022,22 +935,25 @@ defineExpose({
                             <i class="ri-question-line" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div v-if="screenWidth <= 600" class="mobile-size-selector">
-                        <label>Taille</label>
-                        <select v-model.number="size" @change="initializeZones">
-                            <option
-                                v-for="s in [4, 5, 6, 7, 8, 9, 10, 11, 12]"
-                                :key="s"
-                                :value="s"
-                            >
-                                {{ s }}×{{ s }}
-                            </option>
-                        </select>
-                    </div>
-                    <div v-if="benchmarkStatus" class="benchmark-status header-status">
-                        {{ benchmarkStatus }}
-                    </div>
                 </div>
+                <div class="grid-container">
+                    <div class="grid-header">
+                        <div class="size-selector-top">
+                            <label>Taille</label>
+                            <select v-model.number="size" @change="initializeZones">
+                                <option
+                                    v-for="s in [4, 5, 6, 7, 8, 9, 10, 11, 12]"
+                                    :key="s"
+                                    :value="s"
+                                >
+                                    {{ s }}×{{ s }}
+                                </option>
+                            </select>
+                        </div>
+                        <div v-if="benchmarkStatus" class="benchmark-status header-status">
+                            {{ benchmarkStatus }}
+                        </div>
+                    </div>
                 <div
                     class="grid"
                     :style="{
@@ -1067,24 +983,14 @@ defineExpose({
                             @touchstart.prevent="onTouchStart(r, c, $event)"
                             @contextmenu.prevent
                         >
-                            <svg
+                            <QueenIcon
                                 v-if="
                                     positions.some(
                                         (p) => p[0] === r && p[1] === c
                                     )
                                 "
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 640 640"
-                                class="queen-icon"
-                                :style="{
-                                    width: queenIconSize + 'px',
-                                    height: queenIconSize + 'px',
-                                }"
-                            >
-                                <path
-                                    d="M320 144C346.5 144 368 122.5 368 96C368 69.5 346.5 48 320 48C293.5 48 272 69.5 272 96C272 122.5 293.5 144 320 144zM69.5 249L192 448L135.8 518.3C130.8 524.6 128 532.4 128 540.5C128 560.1 143.9 576 163.5 576L476.4 576C496 576 511.9 560.1 511.9 540.5C511.9 532.4 509.2 524.6 504.1 518.3L448 448L570.5 249C574.1 243.1 576 236.3 576 229.4L576 228.8C576 208.5 559.5 192 539.2 192C531.9 192 524.8 194.2 518.8 198.2L501.9 209.5C489.2 218 472.3 216.3 461.5 205.5L427.4 171.4C420.1 164.1 410.2 160 400 160C389.8 160 379.9 164.1 372.7 171.3L342.6 201.4C330.1 213.9 309.8 213.9 297.3 201.4L267.2 171.3C260.1 164.1 250.2 160 240 160C229.8 160 219.9 164.1 212.7 171.3L178.6 205.4C167.8 216.2 150.9 217.9 138.2 209.4L121.3 198.2C115.2 194.2 108.1 192 100.9 192C80.6 192 64.1 208.5 64.1 228.8L64.1 229.4C64.1 236.3 66 243.1 69.6 249z"
-                                />
-                            </svg>
+                                :size="queenIconSize"
+                            />
                         </div>
                     </div>
                 </div>
@@ -1157,18 +1063,6 @@ defineExpose({
                 </div>
             </div>
             <div class="sidebar">
-                <div class="size-selector">
-                    <label>Taille:</label>
-                    <select v-model.number="size" @change="initializeZones">
-                        <option
-                            v-for="s in [4, 5, 6, 7, 8, 9, 10, 11, 12]"
-                            :key="s"
-                            :value="s"
-                        >
-                            {{ s }}x{{ s }}
-                        </option>
-                    </select>
-                </div>
                 <div class="palette">
                     <div
                         v-for="colorIndex in availableColorIndices"
@@ -1315,18 +1209,29 @@ body,
 }
 
 .main-layout {
-    display: grid;
-    grid-template-columns: 1fr 18vw;
+    display: flex;
+    flex-direction: row;
     justify-content: center;
     align-items: flex-start;
     gap: 2vw;
     width: 100%;
+    margin: 0 auto;
     padding: 1vh 1vw;
     flex: 1;
     min-height: 0;
     max-width: 1400px;
     overflow-y: auto;
     box-sizing: border-box;
+}
+
+.actions-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    margin-top: 40px;
 }
 
 /* Vue Historique (onglet, tous appareils) */
@@ -1341,46 +1246,12 @@ body,
     box-sizing: border-box;
 }
 
-@media (max-width: 1200px) {
-    .main-layout {
-        grid-template-columns: 1fr 18vw;
-        gap: 2vw;
-    }
-}
-
-@media (max-width: 900px) {
-    .main-layout {
-        grid-template-columns: 1fr;
-        gap: 2vw;
-    }
-
-    .sidebar {
-        order: 1;
-        min-width: auto;
-        width: 100%;
-        max-width: 400px;
-    }
-
-    .grid-container {
-        order: 0;
-        max-width: none;
-        width: 100%;
-    }
-}
-
-@media (max-width: 400px) {
-    .queen-icon {
-        width: 18px;
-        height: 18px;
-    }
-}
-
 .grid-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 1;
-    width: 100%;
+    flex: 0 1 auto;
+    min-width: 0;
     padding: 0;
     box-sizing: border-box;
     overflow: visible;
@@ -1408,7 +1279,8 @@ body,
 
 .grid-header {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 10px;
@@ -1416,6 +1288,7 @@ body,
 
 .grid-toolbar {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
 }
@@ -1524,11 +1397,6 @@ body,
 
 .cell:hover {
     opacity: 0.8;
-}
-
-.queen-icon {
-    fill: #000;
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
 }
 
 .error-message {
@@ -1793,61 +1661,60 @@ body,
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
-    min-width: 200px;
-    background-color: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    justify-content: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-top: 40px;
+    background-color: #fff;
+    padding: 10px 8px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.size-selector {
+.size-selector-top {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    width: 100%;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.85rem;
 }
 
-.size-selector label {
-    font-weight: bold;
+.size-selector-top label {
+    font-weight: 600;
     color: #333;
 }
 
-.size-selector select {
-    padding: 0.5vh 1vw;
-    border-radius: 8px;
-    border: 0.2vw solid #333;
+.size-selector-top select {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 2px solid #333;
     background-color: #f9f9f9;
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    min-width: 10vw;
-    width: 100%;
 }
 
 .palette {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 10px;
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 12px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    width: auto;
+    padding: 0;
+    background: none;
+    box-shadow: none;
     max-height: none;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .color-btn {
-    width: 50px;
-    height: 50px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin: 0 auto;
+    margin: 0;
     position: relative;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-    border: 3px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.8);
 }
 
 .color-btn:hover {
@@ -1999,11 +1866,19 @@ body,
    base (même spécificité => l'ordre source décide).
    Disposition : grille à gauche + bande palette fine à droite.
    ============================================================ */
-.mobile-size-selector {
-    display: none;
-}
-
 @media (max-width: 600px) {
+    /* Le wrapper reste dans le flux mais sans dimensions propres : son seul
+       enfant (.grid-toolbar) passe en position fixed pour devenir la barre
+       d'actions du bas — display:none le masquerait lui aussi. */
+    .actions-sidebar {
+        margin-top: 0;
+        gap: 0;
+    }
+
+    .sidebar {
+        margin-top: 0;
+    }
+
     .app {
         padding: 0.4vh 2vw;
         overflow: hidden;
@@ -2098,45 +1973,16 @@ body,
     }
 
     /* Sélecteur de taille compact, en haut sous la barre d'outils */
-    .mobile-size-selector {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
+    .size-selector-top {
         margin-top: 0.4vh;
-        font-size: 0.85rem;
-    }
-
-    .mobile-size-selector label {
-        font-weight: 600;
-        color: #333;
-    }
-
-    .mobile-size-selector select {
-        padding: 3px 8px;
-        border-radius: 6px;
-        border: 2px solid #333;
-        background: #f9f9f9;
-        font-size: 0.9rem;
     }
 
     /* Bande palette fine, verticale, à droite */
     .sidebar {
-        flex: 0 0 auto;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
         width: auto;
         min-width: 0;
         gap: 0;
         padding: 6px 5px;
-        border-radius: 12px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-    }
-
-    /* Le sélecteur de taille n'est plus dans la bande palette sur mobile */
-    .sidebar .size-selector {
-        display: none;
     }
 
     .palette {
