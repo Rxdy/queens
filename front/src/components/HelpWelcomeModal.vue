@@ -40,11 +40,27 @@ const emit = defineEmits(["close"]);
             </div>
 
             <p class="welcome-intro">
-                Ce guide vous aide à démarrer : colorier les zones, choisir la taille,
+                Ce guide vous aide à démarrer : jouer à la grille du jour, colorier les zones, choisir la taille,
                 utiliser les boutons, consulter l'historique et importer une grille par matrice ou photo.
             </p>
             <div class="welcome-section">
-                <h4>1. Colorier la grille</h4>
+                <h4>1. Onglet Jeu — Grille du jour</h4>
+                <p>
+                    L'onglet <strong>Jeu</strong> propose chaque jour <strong>4 grilles</strong> de tailles croissantes
+                    (6×6 Facile, 7×7 Moyen, 8×8 Difficile, 9×9 Expert) à résoudre vous-même — contrairement au mode
+                    <strong>Solveur</strong> où c'est le programme qui trouve les placements, ici c'est vous qui posez les reines.
+                </p>
+                <ul>
+                    <li>Cliquez sur une case pour y poser (ou retirer) une reine.</li>
+                    <li>Les reines en conflit (même ligne, colonne, zone, ou cases adjacentes) sont surlignées en rouge.</li>
+                    <li>La grille passe automatiquement en <strong>« Résolu »</strong> dès que toutes les reines sont posées sans aucun conflit.</li>
+                    <li>Les 4 grilles sont <strong>garanties solvables</strong> et sont <strong>les mêmes pour tous les joueurs</strong> ce jour-là.</li>
+                    <li>Elles se renouvellent chaque jour à <strong>8h du matin</strong> (heure locale) — un compte à rebours l'indique en haut de l'onglet.</li>
+                    <li>Votre progression est sauvegardée automatiquement sur cet appareil, mais n'apparaît pas dans l'onglet <strong>Historique</strong> (réservé au mode Solveur).</li>
+                </ul>
+            </div>
+            <div class="welcome-section">
+                <h4>2. Colorier la grille</h4>
                 <p>
                     Choisissez une couleur dans la palette à droite, puis utilisez les cliques pour remplir la grille :
                 </p>
@@ -59,7 +75,7 @@ const emit = defineEmits(["close"]);
                 </p>
             </div>
             <div class="welcome-section">
-                <h4>2. Historique</h4>
+                <h4>3. Historique</h4>
                 <p>
                     Chaque grille résolue est sauvegardée dans l'<strong>historique</strong> de votre session.
                     L'historique affiche le nombre de solutions trouvées et les temps d'exécution du TRM et du baseline.
@@ -67,7 +83,7 @@ const emit = defineEmits(["close"]);
                 </p>
             </div>
             <div class="welcome-section">
-                <h4>3. Boutons principaux</h4>
+                <h4>4. Boutons principaux</h4>
                 <div class="welcome-buttons">
                     <div class="welcome-action">
                         <button class="guide-btn new-icon-btn" disabled>
@@ -144,7 +160,7 @@ const emit = defineEmits(["close"]);
                 </div>
             </div>
             <div class="welcome-section">
-                <h4>4. Raccourcis clavier</h4>
+                <h4>5. Raccourcis clavier</h4>
                 <ul>
                     <li><kbd>Entrée</kbd> ou <kbd>Espace</kbd> — Résoudre (quand la grille est complète)</li>
                     <li><kbd>←</kbd> / <kbd>→</kbd> — Naviguer entre les solutions</li>
@@ -153,7 +169,7 @@ const emit = defineEmits(["close"]);
                 </ul>
             </div>
             <div class="welcome-section">
-                <h4>5. Statistiques</h4>
+                <h4>6. Statistiques</h4>
                 <p>
                     L'onglet <strong>Statistiques</strong> affiche un graphique de performance pour la session actuelle.
                     Vous y voyez les temps moyens de TRM et de Baseline par taille de grille, présentés sur une échelle logarithmique.
@@ -164,7 +180,7 @@ const emit = defineEmits(["close"]);
                 </ul>
             </div>
             <div class="welcome-section">
-                <h4>5. Système d'import</h4>
+                <h4>7. Système d'import</h4>
                 <p>
                     Deux modes sont disponibles : <strong>Matrice</strong> et <strong>Image</strong>.
                 </p>
@@ -181,7 +197,7 @@ const emit = defineEmits(["close"]);
                 </ul>
             </div>
             <div class="welcome-section">
-                <h4>6. Brouillons</h4>
+                <h4>8. Brouillons</h4>
                 <p>
                     Chaque nouvelle grille crée un brouillon enregistré en bas de l'écran.
                     Vous pouvez basculer entre plusieurs brouillons comme des onglets,
@@ -201,7 +217,7 @@ const emit = defineEmits(["close"]);
                 </ul>
             </div>
             <div class="welcome-section">
-                <h4>7. Modèles</h4>
+                <h4>9. Modèles</h4>
                 <p>
                     Un <strong>modèle</strong> désigne ici un algorithme de résolution : une stratégie logique
                     que le programme applique pour trouver les placements valides des reines sur la grille.
