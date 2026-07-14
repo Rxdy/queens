@@ -21,13 +21,20 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    // [[row, col], ...] — croix posées par l'utilisateur pour éliminer des
+    // cases par réflexion ; simple annotation, sans effet sur la victoire.
+    marks: {
+        type: Array,
+        default: () => [],
+    },
 });
 
-const emit = defineEmits(["toggle-cell"]);
+const emit = defineEmits(["toggle-cell", "toggle-mark"]);
 
 const key = (r, c) => `${r},${c}`;
 
 const queenSet = computed(() => new Set(props.queens.map(([r, c]) => key(r, c))));
+const markSet = computed(() => new Set(props.marks.map(([r, c]) => key(r, c))));
 
 // Surbrillance uniquement (même règle que useDailyChallenge.toggleQueen, via
 // le même utilitaire partagé pour ne pas dupliquer la logique de conflit).
@@ -35,7 +42,9 @@ const conflictCells = computed(() => findConflictingQueens(props.zones, props.qu
 
 const queenSize = computed(() => Math.round(Math.max(16, Math.min(32, 260 / props.size))));
 
+// Clic gauche = reine, clic droit = croix (élimination par réflexion).
 const onCellClick = (row, col) => emit("toggle-cell", { row, col });
+const onCellRightClick = (row, col) => emit("toggle-mark", { row, col });
 </script>
 
 <template>
@@ -50,8 +59,10 @@ const onCellClick = (row, col) => emit("toggle-cell", { row, col });
                 :style="{ backgroundColor: colors[cell] }"
                 :aria-label="`Ligne ${r + 1}, colonne ${c + 1}`"
                 @click="onCellClick(r, c)"
+                @contextmenu.prevent="onCellRightClick(r, c)"
             >
                 <QueenIcon v-if="queenSet.has(key(r, c))" :size="queenSize" />
+                <span v-else-if="markSet.has(key(r, c))" class="mark-x" :style="{ fontSize: queenSize + 'px' }">✕</span>
             </button>
         </template>
     </div>
@@ -89,5 +100,12 @@ const onCellClick = (row, col) => emit("toggle-cell", { row, col });
     outline: 3px solid #e53935;
     outline-offset: -3px;
     z-index: 1;
+}
+
+.mark-x {
+    color: rgba(0, 0, 0, 0.45);
+    font-weight: 700;
+    line-height: 1;
+    user-select: none;
 }
 </style>

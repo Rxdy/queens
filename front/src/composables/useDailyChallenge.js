@@ -1,8 +1,11 @@
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useLocalStorage } from "@vueuse/core";
+import axios from "axios";
 import { generateRandomConnectedPattern } from "../utils/generateZones.js";
 import { hasSolution, findConflictingQueens } from "../utils/queensSolver.js";
 import { createSeededRng } from "../utils/seededRandom.js";
+
+const TRM_BASE = import.meta.env.VITE_TRM_API_BASE ?? "";
 
 export const DAILY_SIZES = [6, 7, 8, 9];
 export const RESET_HOUR = 8;
@@ -52,6 +55,9 @@ const generatePuzzlesForDay = (puzzleDay) =>
                     zones,
                     status: "pending",
                     userQueens: [],
+                    userMarks: [],
+                    startedAt: null,
+                    solveTimeMs: null,
                     seedAttempt: attempt,
                 };
             }
@@ -63,6 +69,35 @@ const generatePuzzlesForDay = (puzzleDay) =>
 // appellent useDailyChallenge() lisent/écrivent le même state réactif.
 const state = useLocalStorage(STORAGE_KEY, emptyState());
 
+// Statistiques du défi quotidien partagées entre joueurs (nb de résolutions
+// humaines + meilleur temps, par taille) — best-effort : un souci réseau ne
+// doit jamais bloquer le jeu, qui reste jouable même hors-ligne/sans backend.
+const globalDailyStats = ref({});
+
+const fetchGlobalDailyStats = async () => {
+    if (!state.value.puzzleDay) return;
+    try {
+        const { data } = await axios.get(`${TRM_BASE}/api/daily/stats/${state.value.puzzleDay}`);
+        globalDailyStats.value = data;
+    } catch {
+        // Best-effort : le jeu reste jouable sans ces stats.
+    }
+};
+
+const reportDailySolve = async (puzzleDay, size, timeMs) => {
+    try {
+        const { data } = await axios.post(`${TRM_BASE}/api/daily/solve`, {
+            puzzle_day: puzzleDay,
+            size,
+            time_ms: timeMs,
+        });
+        globalDailyStats.value = { ...globalDailyStats.value, [String(size)]: data };
+    } catch {
+        // Best-effort : la progression locale du joueur reste valable même si
+        // le signalement au serveur échoue.
+    }
+};
+
 export const ensureTodaysPuzzles = () => {
     const today = getCurrentPuzzleDay();
     if (state.value.puzzleDay !== today) {
@@ -71,7 +106,16 @@ export const ensureTodaysPuzzles = () => {
             generatedAt: new Date().toISOString(),
             puzzles: generatePuzzlesForDay(today),
         };
+    } else {
+        // Migration défensive : des puzzles déjà en cache (générés avant l'ajout
+        // de ces champs) peuvent ne pas les avoir — on les complète sans tout régénérer.
+        for (const puzzle of state.value.puzzles) {
+            if (!puzzle.userMarks) puzzle.userMarks = [];
+            if (puzzle.startedAt === undefined) puzzle.startedAt = null;
+            if (puzzle.solveTimeMs === undefined) puzzle.solveTimeMs = null;
+        }
     }
+    fetchGlobalDailyStats();
 };
 
 // Génère immédiatement les grilles du jour dès le chargement du module, pour
@@ -79,6 +123,14 @@ export const ensureTodaysPuzzles = () => {
 ensureTodaysPuzzles();
 
 const findPuzzle = (puzzleId) => state.value.puzzles.find((p) => p.id === puzzleId);
+
+// Démarre le chrono à la première ouverture du puzzle (idempotent : un retour
+// sur un puzzle déjà commencé ne redémarre pas le temps).
+const startPuzzle = (puzzleId) => {
+    const puzzle = findPuzzle(puzzleId);
+    if (!puzzle || puzzle.startedAt !== null) return;
+    puzzle.startedAt = Date.now();
+};
 
 const markSolved = (puzzleId) => {
     const puzzle = findPuzzle(puzzleId);
@@ -98,6 +150,11 @@ const toggleQueen = (puzzleId, row, col) => {
     const puzzle = findPuzzle(puzzleId);
     if (!puzzle || puzzle.status === "solved") return;
 
+    // Reine et croix sont mutuellement exclusives sur une case : poser une
+    // reine efface une croix éventuelle (l'utilisateur change d'avis).
+    const markIdx = puzzle.userMarks.findIndex(([r, c]) => r === row && c === col);
+    if (markIdx !== -1) puzzle.userMarks.splice(markIdx, 1);
+
     const idx = puzzle.userQueens.findIndex(([r, c]) => r === row && c === col);
     if (idx === -1) {
         puzzle.userQueens.push([row, col]);
@@ -108,13 +165,38 @@ const toggleQueen = (puzzleId, row, col) => {
     const solved =
         puzzle.userQueens.length === puzzle.size &&
         findConflictingQueens(puzzle.zones, puzzle.userQueens).size === 0;
-    if (solved) markSolved(puzzleId);
+    if (solved) {
+        const solveTimeMs = puzzle.startedAt !== null ? Date.now() - puzzle.startedAt : null;
+        puzzle.solveTimeMs = solveTimeMs;
+        markSolved(puzzleId);
+        if (solveTimeMs !== null) {
+            reportDailySolve(state.value.puzzleDay, puzzle.size, solveTimeMs);
+        }
+    }
+};
+
+// La croix est une simple annotation de réflexion ("pas une reine ici") —
+// elle ne participe jamais à la détection de victoire.
+const toggleMark = (puzzleId, row, col) => {
+    const puzzle = findPuzzle(puzzleId);
+    if (!puzzle || puzzle.status === "solved") return;
+
+    const queenIdx = puzzle.userQueens.findIndex(([r, c]) => r === row && c === col);
+    if (queenIdx !== -1) puzzle.userQueens.splice(queenIdx, 1);
+
+    const idx = puzzle.userMarks.findIndex(([r, c]) => r === row && c === col);
+    if (idx === -1) {
+        puzzle.userMarks.push([row, col]);
+    } else {
+        puzzle.userMarks.splice(idx, 1);
+    }
 };
 
 const resetPuzzleProgress = (puzzleId) => {
     const puzzle = findPuzzle(puzzleId);
     if (!puzzle) return;
     puzzle.userQueens = [];
+    puzzle.userMarks = [];
     puzzle.status = "pending";
 };
 
@@ -122,9 +204,12 @@ export function useDailyChallenge() {
     return {
         puzzleDay: computed(() => state.value.puzzleDay),
         puzzles: computed(() => state.value.puzzles),
+        globalDailyStats: computed(() => globalDailyStats.value),
         ensureTodaysPuzzles,
         selectPuzzle: findPuzzle,
+        startPuzzle,
         toggleQueen,
+        toggleMark,
         resetPuzzleProgress,
         markSolved,
     };

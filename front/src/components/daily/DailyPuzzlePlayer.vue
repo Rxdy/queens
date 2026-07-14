@@ -2,15 +2,23 @@
 import PuzzleGrid from "./PuzzleGrid.vue";
 import DifficultyBadge from "./DifficultyBadge.vue";
 import PuzzleStatusBadge from "./PuzzleStatusBadge.vue";
+import ElapsedTimer from "./ElapsedTimer.vue";
+import { formatDuration } from "../../utils/format.js";
 
 defineProps({
     puzzle: {
         type: Object,
         required: true,
     },
+    // { count, best_time_ms } | undefined — stats globales (anonymes,
+    // partagées entre joueurs) pour cette taille de grille aujourd'hui.
+    globalStats: {
+        type: Object,
+        default: null,
+    },
 });
 
-const emit = defineEmits(["toggle-cell", "back"]);
+const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
 </script>
 
 <template>
@@ -22,17 +30,30 @@ const emit = defineEmits(["toggle-cell", "back"]);
             <span class="daily-player-size">{{ puzzle.size }}×{{ puzzle.size }}</span>
             <DifficultyBadge :size="puzzle.size" />
             <PuzzleStatusBadge :status="puzzle.status" />
+            <ElapsedTimer v-if="puzzle.status !== 'solved'" :started-at="puzzle.startedAt" />
         </div>
 
         <p v-if="puzzle.status === 'solved'" class="solved-banner">
-            <i class="ri-trophy-line" aria-hidden="true"></i> Résolu ! Vous pouvez continuer à explorer la grille ou revenir aux défis.
+            <i class="ri-trophy-line" aria-hidden="true"></i> Résolu en <strong>{{ formatDuration(puzzle.solveTimeMs) }}</strong> !
+            Vous pouvez continuer à explorer la grille ou revenir aux défis.
+        </p>
+        <p v-else class="interaction-hint">
+            Clic gauche : poser une reine — clic droit (ou appui long) : poser une croix pour éliminer une case.
+        </p>
+
+        <p v-if="globalStats && globalStats.count > 0" class="global-daily-stats">
+            <i class="ri-group-line" aria-hidden="true"></i>
+            {{ globalStats.count }} joueur{{ globalStats.count > 1 ? "s" : "" }} {{ globalStats.count > 1 ? "ont" : "a" }} résolu cette grille aujourd'hui
+            — meilleur temps : <strong>{{ formatDuration(globalStats.best_time_ms) }}</strong>
         </p>
 
         <PuzzleGrid
             :size="puzzle.size"
             :zones="puzzle.zones"
             :queens="puzzle.userQueens"
+            :marks="puzzle.userMarks"
             @toggle-cell="emit('toggle-cell', $event)"
+            @toggle-mark="emit('toggle-mark', $event)"
         />
     </div>
 </template>
@@ -90,5 +111,24 @@ const emit = defineEmits(["toggle-cell", "back"]);
     border-radius: 8px;
     font-size: 0.85rem;
     font-weight: 600;
+}
+
+.interaction-hint {
+    margin: 0;
+    color: #777;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.global-daily-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 6px 14px;
+    background: #eef2ff;
+    color: #3730a3;
+    border-radius: 8px;
+    font-size: 0.82rem;
 }
 </style>

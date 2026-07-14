@@ -18,7 +18,7 @@ const BASELINE_BASE = import.meta.env.VITE_BASELINE_API_BASE ?? "";
 // Configuration axios sans timeout pour permettre les requêtes long-running
 axios.defaults.timeout = 0; // 0 = pas de timeout
 
-const currentView = ref("game");
+const currentView = ref("daily");
 
 const size = ref(8);
 const zones = ref([]);
@@ -1180,6 +1180,14 @@ body,
     padding: 4px;
     border-radius: 10px;
     flex-shrink: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.view-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .view-tab {
@@ -1195,6 +1203,8 @@ body,
     background: transparent;
     color: #666;
     transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .view-tab:hover {
@@ -1892,6 +1902,11 @@ body,
 
     .view-tabs {
         margin-bottom: 0.4vh;
+    }
+
+    .view-tab {
+        padding: 6px 12px;
+        font-size: 0.8rem;
     }
 
     /* Historique masqué sur mobile pour tenir sur un écran */

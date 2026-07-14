@@ -128,3 +128,24 @@ class GlobalStats(BaseModel):
     total_solves: int = Field(..., description="Nombre total de résolutions comptabilisées")
     overall: SizeStats = Field(..., description="Statistiques toutes tailles confondues")
     by_size: dict[str, SizeStats] = Field(..., description="Statistiques par taille de grille")
+
+
+class DailySolveInput(BaseModel):
+    """Signalement (anonyme) d'une résolution humaine d'une grille du défi quotidien"""
+
+    puzzle_day: str = Field(
+        ..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Jour du défi résolu (YYYY-MM-DD)"
+    )
+    size: int = Field(..., ge=1, description="Taille de la grille résolue")
+    time_ms: float = Field(
+        ..., ge=100, description="Temps de résolution en millisecondes (mesuré côté client)"
+    )
+
+
+class DailySizeStats(BaseModel):
+    """Statistiques agrégées du défi quotidien pour une taille donnée, un jour donné"""
+
+    count: int = Field(..., description="Nombre de résolutions humaines comptabilisées")
+    best_time_ms: float | None = Field(
+        None, description="Meilleur temps de résolution (millisecondes)"
+    )

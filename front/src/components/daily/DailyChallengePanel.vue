@@ -4,7 +4,8 @@ import { useDailyChallenge } from "../../composables/useDailyChallenge.js";
 import DailyChallengePicker from "./DailyChallengePicker.vue";
 import DailyPuzzlePlayer from "./DailyPuzzlePlayer.vue";
 
-const { puzzles, ensureTodaysPuzzles, selectPuzzle, toggleQueen } = useDailyChallenge();
+const { puzzles, globalDailyStats, ensureTodaysPuzzles, selectPuzzle, startPuzzle, toggleQueen, toggleMark } =
+    useDailyChallenge();
 
 const selectedPuzzleId = ref(null);
 const selectedPuzzle = computed(() =>
@@ -13,6 +14,7 @@ const selectedPuzzle = computed(() =>
 
 const onSelect = (id) => {
     selectedPuzzleId.value = id;
+    startPuzzle(id);
 };
 
 const onBack = () => {
@@ -22,6 +24,11 @@ const onBack = () => {
 const onToggleCell = ({ row, col }) => {
     if (!selectedPuzzleId.value) return;
     toggleQueen(selectedPuzzleId.value, row, col);
+};
+
+const onToggleMark = ({ row, col }) => {
+    if (!selectedPuzzleId.value) return;
+    toggleMark(selectedPuzzleId.value, row, col);
 };
 
 // Si le jour change pendant que l'onglet reste ouvert (ex: laissé ouvert la
@@ -55,7 +62,9 @@ onUnmounted(() => {
         <DailyPuzzlePlayer
             v-if="selectedPuzzle"
             :puzzle="selectedPuzzle"
+            :global-stats="globalDailyStats[String(selectedPuzzle.size)]"
             @toggle-cell="onToggleCell"
+            @toggle-mark="onToggleMark"
             @back="onBack"
         />
         <DailyChallengePicker

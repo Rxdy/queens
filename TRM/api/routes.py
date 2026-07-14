@@ -10,8 +10,17 @@ from functools import partial
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from api.limiter import limiter
-from api.models import ExtractedMatrix, GlobalStats, GridInput, PerformanceMetrics, Solution
+from api.models import (
+    DailySizeStats,
+    DailySolveInput,
+    ExtractedMatrix,
+    GlobalStats,
+    GridInput,
+    PerformanceMetrics,
+    Solution,
+)
 from core.config import MAX_ITERATIONS
+from core.daily_stats import get_daily_stats, record_daily_solve
 from core.solver import QueensSolver
 from core.stats import get_stats, record_solve
 from utils.image_processor import extract_matrix_from_image
@@ -149,3 +158,21 @@ async def stats():
     compteurs glissants (moyenne, min, max) par taille de grille.
     """
     return get_stats()
+
+
+@router.post("/daily/solve", response_model=DailySizeStats)
+@limiter.limit("30/minute")
+async def daily_solve(request: Request, payload: DailySolveInput):
+    """
+    Signale (anonymement) qu'un joueur a résolu la grille du défi quotidien.
+
+    Aucun identifiant joueur n'est stocké — uniquement un compteur et le
+    meilleur temps, par jour et par taille de grille.
+    """
+    return record_daily_solve(payload.puzzle_day, payload.size, payload.time_ms)
+
+
+@router.get("/daily/stats/{puzzle_day}", response_model=dict[str, DailySizeStats])
+async def daily_stats(puzzle_day: str):
+    """Statistiques du défi quotidien (nb de résolutions, meilleur temps) pour un jour donné."""
+    return get_daily_stats(puzzle_day)

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { getCurrentPuzzleDay, getNextResetAt, useDailyChallenge, DAILY_SIZES } from '../composables/useDailyChallenge.js'
 import { hasSolution } from '../utils/queensSolver.js'
 
@@ -58,13 +58,48 @@ describe('useDailyChallenge', () => {
     expect(selectPuzzle(id).status).toBe('solved')
   })
 
-  it('resetPuzzleProgress vide les reines et repasse en pending', () => {
-    const { puzzles, toggleQueen, markSolved, resetPuzzleProgress, selectPuzzle } = useDailyChallenge()
+  it('resetPuzzleProgress vide les reines, les croix et repasse en pending', () => {
+    const { puzzles, toggleQueen, toggleMark, markSolved, resetPuzzleProgress, selectPuzzle } = useDailyChallenge()
     const id = puzzles.value[2].id
     toggleQueen(id, 1, 1)
+    toggleMark(id, 2, 2)
     markSolved(id)
     resetPuzzleProgress(id)
     expect(selectPuzzle(id).userQueens).toEqual([])
+    expect(selectPuzzle(id).userMarks).toEqual([])
     expect(selectPuzzle(id).status).toBe('pending')
+  })
+
+  it('toggleMark ajoute puis retire une croix', () => {
+    const { puzzles, toggleMark, selectPuzzle } = useDailyChallenge()
+    const id = puzzles.value[3].id
+    toggleMark(id, 0, 1)
+    expect(selectPuzzle(id).userMarks).toEqual([[0, 1]])
+    toggleMark(id, 0, 1)
+    expect(selectPuzzle(id).userMarks).toEqual([])
+  })
+
+  it('poser une reine efface une croix existante sur la même case, et inversement', () => {
+    const { puzzles, toggleQueen, toggleMark, selectPuzzle } = useDailyChallenge()
+    const id = puzzles.value[3].id
+    toggleMark(id, 1, 2)
+    toggleQueen(id, 1, 2)
+    expect(selectPuzzle(id).userMarks).toEqual([])
+    expect(selectPuzzle(id).userQueens).toEqual([[1, 2]])
+
+    toggleMark(id, 1, 2)
+    expect(selectPuzzle(id).userQueens).toEqual([])
+    expect(selectPuzzle(id).userMarks).toEqual([[1, 2]])
+  })
+
+  it('startPuzzle démarre le chrono une seule fois (idempotent)', () => {
+    const { puzzles, startPuzzle, selectPuzzle } = useDailyChallenge()
+    const id = puzzles.value[3].id
+    expect(selectPuzzle(id).startedAt).toBeNull()
+    startPuzzle(id)
+    const firstStart = selectPuzzle(id).startedAt
+    expect(firstStart).not.toBeNull()
+    startPuzzle(id)
+    expect(selectPuzzle(id).startedAt).toBe(firstStart)
   })
 })

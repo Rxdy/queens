@@ -2,6 +2,7 @@
 import MiniGridPreview from "./MiniGridPreview.vue";
 import DifficultyBadge from "./DifficultyBadge.vue";
 import PuzzleStatusBadge from "./PuzzleStatusBadge.vue";
+import { formatDuration } from "../../utils/format.js";
 
 defineProps({
     puzzle: {
@@ -21,6 +22,9 @@ const emit = defineEmits(["play"]);
             <DifficultyBadge :size="puzzle.size" />
         </div>
         <PuzzleStatusBadge :status="puzzle.status" />
+        <span v-if="puzzle.status === 'solved'" class="puzzle-card-time">
+            Votre temps : {{ formatDuration(puzzle.solveTimeMs) }}
+        </span>
         <span class="puzzle-card-cta">
             {{ puzzle.status === "solved" ? "Rejouer" : "Jouer" }}
             <i class="ri-arrow-right-line" aria-hidden="true"></i>
@@ -68,5 +72,10 @@ const emit = defineEmits(["play"]);
     font-size: 0.85rem;
     font-weight: 600;
     color: #3730a3;
+}
+
+.puzzle-card-time {
+    font-size: 0.78rem;
+    color: #666;
 }
 </style>

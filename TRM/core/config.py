@@ -19,3 +19,7 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Fichier des statistiques globales agrégées (monté sur un volume persistant en prod)
 STATS_FILE_PATH = os.getenv("STATS_FILE_PATH", "/app/data/stats.json")
+
+# Fichier des statistiques du défi quotidien (nb de résolutions humaines + meilleur
+# temps, par jour/taille) — même volume persistant que STATS_FILE_PATH
+DAILY_STATS_FILE_PATH = os.getenv("DAILY_STATS_FILE_PATH", "/app/data/daily_stats.json")
