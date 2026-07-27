@@ -1,4 +1,4 @@
-# Queens Game Solver 🎯
+# Queens Game Solver
 
 [![CI/CD](https://github.com/Rxdy/queens/actions/workflows/ci.yml/badge.svg)](https://github.com/Rxdy/queens/actions/workflows/ci.yml)
 
@@ -6,7 +6,7 @@ Application interactive pour le **Problème des N-Reines**. Cette app compare de
 
 Vous pouvez dessiner votre plateau, importer une image de grille de zones colorées, puis lancer la résolution et le benchmark des deux modèles.
 
-## 🎮 À propos du jeu des Reines
+## À propos du jeu des Reines
 
 Dans cette application, le plateau est divisé en **zones colorées**. Le but est de placer **une reine par zone** de sorte que :
 - Aucune reine ne soit sur la même **ligne** qu'une autre
@@ -20,7 +20,7 @@ Chaque zone correspond à une région du plateau et doit contenir exactement **u
 - il faut respecter une reine par zone
 - il faut respecter les contraintes de ligne, colonne, diagonale et adjacency
 
-## 🤖 Deux algorithmes en compétition
+## Deux algorithmes en compétition
 
 ### 1. **TRM (Transformer-based Reasoning Model)**
 - Approche moderne utilisant des réseaux de neurones  
@@ -34,31 +34,31 @@ Chaque zone correspond à une région du plateau et doit contenir exactement **u
 
 **Fonctionnalité Benchmark** : Testez et comparez les deux modèles sur des grilles de 4 à 12 reines avec des temps d'exécution détaillés.
 
-## ✨ Fonctionnalités
+## Fonctionnalités
 
-- 🎨 **Interface interactive** : Dessinez les zones colorées directement
-- 🔍 **Import d'images** : Extrayez une grille de zones à partir d'une photo
-- 📊 **Benchmark** : Comparez TRM vs Baseline sur 9 tailles différentes
-- 📜 **Historique** : Retrouvez vos résolutions précédentes
-- 📱 **Responsive** : Fonctionne sur tous les appareils
+- **Interface interactive** : Dessinez les zones colorées directement
+- **Import d'images** : Extrayez une grille de zones à partir d'une photo
+- **Benchmark** : Comparez TRM vs Baseline sur 9 tailles différentes
+- **Historique** : Retrouvez vos résolutions précédentes
+- **Responsive** : Fonctionne sur tous les appareils
 
 ---
 
-## 🚀 Installation & Lancement
+## Installation & Lancement
 
 ### Prérequis
 
 - **Git** pour cloner le projet
 - **Docker et Docker Compose** pour l'exécution
 
-### 1️⃣ Cloner le projet
+### 1. Cloner le projet
 
 ```bash
 git clone https://github.com/yourusername/queens.git
 cd queens
 ```
 
-### 2️⃣ Lancer l'application
+### 2. Lancer l'application
 
 ```bash
 # Démarrage simple (logs visibles)
@@ -70,7 +70,7 @@ make run
 
 Les services démarrent automatiquement. Les dépendances sont installées dans les containers.
 
-### 3️⃣ Accéder à l'application
+### 3. Accéder à l'application
 
 - **Page d'accueil** : http://localhost:5173
   - Statut : service **Frontend**
@@ -85,7 +85,7 @@ Les services démarrent automatiquement. Les dépendances sont installées dans 
   - Statut : service **Solveur Baseline**
   - Description : endpoint de comparaison heuristique, pour mesurer les performances du solveur de référence
 
-### ✅ Vérifier l'état des services
+### Vérifier l'état des services
 
 ```bash
 make services
@@ -96,7 +96,7 @@ Affiche l'état de chaque service avec son URL et son statut.
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 La documentation complète est dans le dossier [documentation/](documentation/README.md), organisée en deux axes :
 
@@ -109,7 +109,7 @@ Chaque fichier est relié par une navigation `← Précédent / Suivant →`.
 
 ---
 
-## 🛠️ Commandes Make disponibles
+## Commandes Make disponibles
 
 ```bash
 # Gestion des services
@@ -130,7 +130,7 @@ make help      # Afficher toutes les commandes disponibles
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 | Composant | Technologie | Port |
 |-----------|-------------|------|
@@ -142,7 +142,7 @@ Tous les services s'exécutent dans des **containers Docker isolés**.
 
 ---
 
-## 📁 Structure du projet
+## Structure du projet
 
 ```
 queens/
@@ -168,7 +168,7 @@ queens/
 
 ---
 
-## 🔧 Développement local (sans Docker)
+## Développement local (sans Docker)
 
 Si vous préférez développer en local :
 
@@ -195,7 +195,7 @@ uvicorn app:app --host 0.0.0.0 --port 8001 --reload
 
 ---
 
-## 🤝 Contribution
+## Contribution
 
 1. Fork le projet
 2. Créez votre branche (`git checkout -b feature/AmazingFeature`)
@@ -205,6 +205,6 @@ uvicorn app:app --host 0.0.0.0 --port 8001 --reload
 
 ---
 
-## 📝 Licence
+## Licence
 
 Ce projet est sous licence MIT.
