@@ -2,10 +2,19 @@ services:
     queens:
         image: ghcr.io/rxdy/queens-queens:latest
         build: ./front
+        restart: unless-stopped
         ports:
             - "5173:80"
+        # nginx résout ses upstreams **au démarrage** : si un solveur n'est pas
+        # encore joignable, nginx sort en erreur (`host not found in upstream`)
+        # et, sans politique de redémarrage, ne retente jamais. C'est ce qui a
+        # laissé queens.rxdy.fr HS 7 jours (27/07 → 04/08/2026).
+        # Les DEUX solveurs référencés dans front/nginx.conf doivent donc figurer
+        # ici — `baseline-solveur` manquait, d'où le crash.
         depends_on:
             trm-solveur:
+                condition: service_healthy
+            baseline-solveur:
                 condition: service_healthy
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost"]
@@ -28,6 +37,7 @@ services:
     trm-solveur:
         image: ghcr.io/rxdy/queens-trm-solveur:latest
         build: ./TRM
+        restart: unless-stopped
         ports:
             - "8000:8000"
         volumes:
@@ -48,6 +58,7 @@ services:
     baseline-solveur:
         image: ghcr.io/rxdy/queens-baseline-solveur:latest
         build: ./baseline-8queens
+        restart: unless-stopped
         ports:
             - "8001:8001"
         stop_grace_period: 1s
