@@ -1,6 +1,6 @@
 # Auto-déploiement en prod (Raspberry Pi).
-# Watchtower surveille GHCR et met à jour automatiquement les conteneurs queens
-# quand une nouvelle image :latest est publiée par le CI.
+# Watchtower surveille GHCR et met à jour automatiquement les conteneurs labellisés de toutes les apps du Pi
+# quand une nouvelle image :latest est publiée (c'est-à-dire à chaque version vX.Y.Z).
 #
 # À lancer UNIQUEMENT sur le Pi, en plus du stack principal :
 #   docker compose -f docker-compose.watchtower.yml up -d
@@ -12,8 +12,12 @@ services:
         image: containrrr/watchtower
         container_name: watchtower
         restart: unless-stopped
+        mem_limit: 128m
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
+            # identifiants GHCR du Pi (docker login ghcr.io) : sans eux, les images PRIVÉES (charlene, traintracks…)
+            # ne sont jamais mises à jour (« unauthorized »)
+            - /home/rudya/.docker/config.json:/config.json:ro
         command: --interval 300 --cleanup --label-enable
         # --interval 300 : vérifie GHCR toutes les 5 min
         # --cleanup      : supprime les anciennes images après mise à jour
