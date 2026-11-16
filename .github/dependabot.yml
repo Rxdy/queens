@@ -1,0 +1,91 @@
+# Dependabot : une fois par semaine (lundi 6 h), une PR par lot de mises à jour mineures, une PR par mise à jour majeure.
+# Chaque PR passe par la CI (tests) avant d'être fusionnée ; les alertes de sécurité arrivent aussi par e-mail.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/front"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      npm-front-mineures:
+        update-types: [minor, patch]
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      pip-mineures:
+        update-types: [minor, patch]
+  - package-ecosystem: pip
+    directory: "/TRM"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      pip-TRM-mineures:
+        update-types: [minor, patch]
+  - package-ecosystem: pip
+    directory: "/baseline-8queens"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      pip-baseline-8queens-mineures:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: "/front"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: "/TRM"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: "/baseline-8queens"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-mineures:
+        update-types: [minor, patch]
