@@ -1,4 +1,4 @@
-.PHONY: up down build run stop logs clean services status check-docker help dev-front dev-backend dev-both dev-ide test-e2e test-e2e-debug test-e2e-ui test-e2e-all test-images test-components test-integration test-unit-front test-unit-front-watch test-unit-front-coverage test-unit-front-ui ide-view
+.PHONY: up down build run stop logs clean services status check-docker help dev-front dev-backend dev-both dev-ide test-e2e test-e2e-debug test-e2e-ui test-e2e-all test-images test-components test-integration test-unit-front test-unit-front-watch test-unit-front-coverage test-unit-front-ui ide-view release
 
 # Vérifier que Docker et Docker Compose sont disponibles
 check-docker:
@@ -159,3 +159,6 @@ help:
 	@echo "  make help   - Afficher cette aide"
 	@echo ""
 	@echo "📦 Aucune dépendance n'est requise sur votre machine !"
+
+release: ## Publie une version : make release V=1.0.0 (tag vX.Y.Z sur main, déjà en prod ; la CI pose la version sur les images et crée la release)
+	@.github/images/release.sh "$(V)"

@@ -1,0 +1,30 @@
+{
+  "projet": "queens",
+  "plateformes": "linux/arm64",
+  "services": {
+    "queens": {
+      "image": "queens-queens",
+      "contexte": "front",
+      "dockerfile": "front/Dockerfile",
+      "sources": [
+        "front"
+      ]
+    },
+    "trm-solveur": {
+      "image": "queens-trm-solveur",
+      "contexte": "TRM",
+      "dockerfile": "TRM/Dockerfile",
+      "sources": [
+        "TRM"
+      ]
+    },
+    "baseline-solveur": {
+      "image": "queens-baseline-solveur",
+      "contexte": "baseline-8queens",
+      "dockerfile": "baseline-8queens/Dockerfile",
+      "sources": [
+        "baseline-8queens"
+      ]
+    }
+  }
+}
