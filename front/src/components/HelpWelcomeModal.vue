@@ -263,7 +263,7 @@ const emit = defineEmits(["close"]);
                         </ul>
                     </div>
                 </div>
-                <p style="margin-top: 10px; font-size: 0.85em; color: var(--text-secondary, #888);">
+                <p style="margin-top: 10px; font-size: 0.85em; color: var(--color-text-muted);">
                     Les deux modèles produisent exactement les mêmes solutions — la différence réside dans le nombre d'états
                     explorés et donc la <em>vitesse d'exécution</em>. Le TRM explore typiquement 20 à 50 % d'états en moins.
                 </p>
@@ -310,27 +310,27 @@ const emit = defineEmits(["close"]);
 
 .welcome-intro {
     margin-bottom: 1rem;
-    color: #444;
+    color: var(--color-text-muted);
     font-size: 0.98rem;
 }
 
 .game-intro {
     margin-bottom: 1.2rem;
     padding: 1rem 1.2rem;
-    background: linear-gradient(135deg, #eef4ff 0%, #f6f0ff 100%);
-    border: 1px solid #d6e0f5;
+    background: linear-gradient(135deg, var(--color-primary-bg) 0%, var(--color-surface-alt) 100%);
+    border: 1px solid var(--color-border);
     border-radius: 14px;
 }
 
 .game-intro h4 {
     margin: 0 0 0.6rem 0;
     font-size: 1.05rem;
-    color: #1a2b4a;
+    color: var(--color-text);
 }
 
 .game-intro p {
     margin: 0;
-    color: #3a3a3a;
+    color: var(--color-text);
     line-height: 1.55;
     font-size: 0.95rem;
 }
@@ -338,7 +338,7 @@ const emit = defineEmits(["close"]);
 .game-intro .rules-list {
     margin: 0.7rem 0;
     padding-left: 1.2rem;
-    color: #3a3a3a;
+    color: var(--color-text);
     font-size: 0.95rem;
     line-height: 1.5;
 }
@@ -350,9 +350,9 @@ const emit = defineEmits(["close"]);
 .game-intro .game-role {
     margin-top: 0.7rem;
     padding-top: 0.7rem;
-    border-top: 1px solid #d6e0f5;
+    border-top: 1px solid var(--color-border);
     font-size: 0.92rem;
-    color: #4a4a4a;
+    color: var(--color-text-muted);
 }
 
 .welcome-section {
@@ -362,13 +362,13 @@ const emit = defineEmits(["close"]);
 .welcome-section h4 {
     margin-bottom: 0.5rem;
     font-size: 1rem;
-    color: #111;
+    color: var(--color-text);
 }
 
 .welcome-section p,
 .welcome-section ul {
     margin: 0;
-    color: #444;
+    color: var(--color-text-muted);
     line-height: 1.55;
     font-size: 0.95rem;
 }
@@ -390,10 +390,10 @@ const emit = defineEmits(["close"]);
 }
 
 .model-card {
-    border: 1px solid #e3e8f0;
+    border: 1px solid var(--color-border);
     border-radius: 14px;
     overflow: hidden;
-    background: #fbfbff;
+    background: var(--color-surface-alt);
 }
 
 .model-card-header {
@@ -405,13 +405,13 @@ const emit = defineEmits(["close"]);
 }
 
 .model-trm {
-    background: linear-gradient(90deg, #e8f0fe 0%, #f0f4ff 100%);
-    border-bottom: 1px solid #c5d5f8;
+    background: linear-gradient(90deg, var(--color-primary-bg) 0%, var(--color-surface-alt) 100%);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .model-baseline {
-    background: linear-gradient(90deg, #fef3e8 0%, #fff8f0 100%);
-    border-bottom: 1px solid #f8d5a0;
+    background: linear-gradient(90deg, var(--color-soon-bg) 0%, var(--color-soon-bg) 100%);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .model-badge {
@@ -422,7 +422,7 @@ const emit = defineEmits(["close"]);
     font-weight: 700;
     letter-spacing: 0.04em;
     background: rgba(0,0,0,0.08);
-    color: #333;
+    color: var(--color-text);
 }
 
 .model-card p,
@@ -430,7 +430,7 @@ const emit = defineEmits(["close"]);
     padding: 0.7rem 1rem;
     margin: 0;
     font-size: 0.9rem;
-    color: #444;
+    color: var(--color-text-muted);
     line-height: 1.5;
 }
 
@@ -460,9 +460,9 @@ const emit = defineEmits(["close"]);
     gap: 0.9rem;
     align-items: flex-start;
     padding: 1rem;
-    border: 1px solid #e3e8f0;
+    border: 1px solid var(--color-border);
     border-radius: 14px;
-    background: #fbfbff;
+    background: var(--color-surface-alt);
 }
 
 .guide-btn {
@@ -476,8 +476,8 @@ const emit = defineEmits(["close"]);
     justify-content: center;
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.1);
-    background: #fff;
-    color: #333;
+    background: var(--color-surface);
+    color: var(--color-text);
     cursor: default;
     opacity: 1;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
@@ -491,30 +491,30 @@ const emit = defineEmits(["close"]);
 
 .welcome-action .guide-btn.benchmark-icon-btn,
 .welcome-action .guide-btn.benchmark-icon-btn:disabled {
-    background-color: #1565c0 !important;
-    color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: var(--color-on-solid) !important;
     border: none !important;
-    box-shadow: 0 2px 6px rgba(21, 101, 192, 0.3) !important;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
 }
 
 .welcome-action .guide-btn.import-icon-btn,
 .welcome-action .guide-btn.import-icon-btn:disabled {
-    background-color: #9c27b0 !important;
-    color: #fff !important;
+    background-color: var(--color-violet) !important;
+    color: var(--color-on-solid) !important;
     border: none !important;
-    box-shadow: 0 2px 6px rgba(156, 39, 176, 0.3) !important;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-violet) 30%, transparent) !important;
 }
 
 .guide-btn:disabled {
     opacity: 1;
-    background: #fff;
-    color: #333;
+    background: var(--color-surface);
+    color: var(--color-text);
 }
 
 .welcome-action .guide-btn.random-icon-btn,
 .welcome-action .guide-btn.random-icon-btn:disabled {
-    background-color: #fff;
-    color: #111;
+    background-color: var(--color-surface);
+    color: var(--color-text);
 }
 
 .welcome-action .guide-btn.benchmark-icon-btn:disabled,
@@ -540,9 +540,9 @@ const emit = defineEmits(["close"]);
 
 .welcome-window kbd {
     display: inline-block;
-    background: #f1f5f9;
-    color: #1f2937;
-    border: 1px solid #cbd5e1;
+    background: var(--color-surface-alt);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
     border-bottom-width: 2px;
     padding: 0.1rem 0.45rem;
     border-radius: 5px;
@@ -551,8 +551,8 @@ const emit = defineEmits(["close"]);
 }
 
 .welcome-window code {
-    background: #f1f5f9;
-    color: #1f2937;
+    background: var(--color-surface-alt);
+    color: var(--color-text);
     padding: 0.15rem 0.4rem;
     border-radius: 6px;
     font-size: 0.92rem;
@@ -568,7 +568,7 @@ const emit = defineEmits(["close"]);
     padding: 1vh 2vw;
     font-size: 1rem;
     cursor: pointer;
-    background-color: #4caf50;
+    background-color: var(--color-success);
     color: white;
     border: none;
     border-radius: 8px;
@@ -578,53 +578,53 @@ const emit = defineEmits(["close"]);
 }
 
 .solve-btn:hover:not(:disabled) {
-    background-color: #45a049;
+    background-color: var(--color-success-hover);
 }
 
 .solve-btn:disabled {
-    background-color: #cccccc;
+    background-color: var(--color-border);
     cursor: not-allowed;
 }
 
 .solve-icon-btn {
-    background-color: #4caf50 !important;
-    color: #fff !important;
+    background-color: var(--color-success) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-success) 30%, transparent);
 }
 
 .reset-icon-btn {
-    background-color: #d32f2f !important;
-    color: #fff !important;
+    background-color: var(--color-danger) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-danger) 30%, transparent);
 }
 
 .new-icon-btn {
-    background-color: #ff9800 !important;
-    color: #fff !important;
+    background-color: var(--color-accent) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(255, 152, 0, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .help-icon-btn {
-    background-color: #00bcd4 !important;
-    color: #fff !important;
+    background-color: var(--color-cyan) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(0, 188, 212, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-cyan) 30%, transparent);
 }
 
 .copy-icon-btn {
-    background-color: #2196f3 !important;
-    color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(33, 150, 243, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
 .download-icon-btn {
-    background-color: #ff6f00 !important;
-    color: #fff !important;
+    background-color: var(--color-accent) !important;
+    color: var(--color-on-solid) !important;
     border: none;
-    box-shadow: 0 2px 6px rgba(255, 111, 0, 0.3);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 </style>

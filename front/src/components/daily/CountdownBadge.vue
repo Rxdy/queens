@@ -49,8 +49,8 @@ const remainingLabel = computed(() => {
     gap: 6px;
     padding: 4px 12px;
     border-radius: 999px;
-    background: #eef2ff;
-    color: #3730a3;
+    background: var(--color-surface-alt);
+    color: var(--color-primary-hover);
     font-size: 0.85rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;

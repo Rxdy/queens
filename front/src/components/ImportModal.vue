@@ -45,7 +45,7 @@ const importLegendItems = computed(() => {
     }));
     items.push({
         value: -1,
-        color: "#fff",
+        color: "var(--color-surface)",
         label: "-1 = cellule vide",
         isEmpty: true,
     });
@@ -314,7 +314,7 @@ defineExpose({ open });
                                 class="legend-color"
                                 :class="{ 'empty-cell': item.isEmpty }"
                                 :style="{
-                                    backgroundColor: item.isEmpty ? '#fff' : item.color,
+                                    backgroundColor: item.isEmpty ? 'var(--color-surface)' : item.color,
                                 }"
                             ></span>
                             <span>{{ item.label }}</span>
@@ -372,9 +372,9 @@ defineExpose({ open });
                                 class="import-preview-cell"
                                 :style="{
                                     backgroundColor:
-                                        cell.value === -1 ? '#fff' : colors[cell.value],
-                                    color: cell.value === -1 ? '#999' : '#000',
-                                    borderColor: cell.value === -1 ? '#ccc' : '#000'
+                                        cell.value === -1 ? 'var(--color-surface)' : colors[cell.value],
+                                    color: cell.value === -1 ? 'var(--color-text-faint)' : 'var(--color-queen)',
+                                    borderColor: cell.value === -1 ? 'var(--color-border)' : 'var(--color-grid-line)'
                                 }"
                             >
                                 {{ cell.raw === '' ? '-' : cell.raw }}
@@ -436,14 +436,14 @@ defineExpose({ open });
 
 .modal-window p {
     margin: 0 0 1rem 0;
-    color: #444;
+    color: var(--color-text-muted);
     line-height: 1.5;
 }
 
 .matrix-textarea {
     width: 100%;
     min-height: 180px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-border);
     border-radius: 10px;
     padding: 1rem;
     font-size: 0.95rem;
@@ -452,16 +452,16 @@ defineExpose({ open });
 }
 
 .matrix-textarea.invalid {
-    border: 1px solid #d32f2f;
-    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.18);
+    border: 1px solid var(--color-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
 }
 
 .modal-error {
     margin-top: 1rem;
     padding: 0.85rem 1rem;
-    background: #ffebee;
-    color: #c62828;
-    border: 1px solid #f8bdbd;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger-bg);
     border-radius: 8px;
     font-size: 0.9rem;
 }
@@ -494,19 +494,19 @@ defineExpose({ open });
 
 .mode-btn {
     flex: 1;
-    border: 1px solid #c5cfe8;
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 0.85rem 1rem;
-    background: #fff;
-    color: #1f2937;
+    background: var(--color-surface);
+    color: var(--color-text);
     cursor: pointer;
     font-weight: 700;
 }
 
 .mode-btn.active {
-    background: #1976d2;
-    color: #fff;
-    border-color: #115293;
+    background: var(--color-primary);
+    color: var(--color-on-solid);
+    border-color: var(--color-primary-hover);
 }
 
 .import-image-panel {
@@ -521,14 +521,14 @@ defineExpose({ open });
 
 .image-input-note {
     font-size: 0.9rem;
-    color: #555;
+    color: var(--color-text-muted);
 }
 
 .image-preview {
-    border: 1px solid #d0d8f0;
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     padding: 0.75rem;
-    background: #fff;
+    background: var(--color-surface);
 }
 
 .image-preview img {
@@ -543,13 +543,13 @@ defineExpose({ open });
     flex-direction: column;
     gap: 0.35rem;
     padding: 0.85rem 1rem;
-    border: 1px solid #d5dcef;
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    background: #f7f9ff;
+    background: var(--color-surface-alt);
 }
 
 .legend-toggle-btn {
-    background: #1976d2;
+    background: var(--color-primary);
     color: white;
     border: none;
     border-radius: 8px;
@@ -560,7 +560,7 @@ defineExpose({ open });
 }
 
 .legend-toggle-btn:hover {
-    background: #115293;
+    background: var(--color-primary-hover);
 }
 
 .modal-import-content {
@@ -577,8 +577,8 @@ defineExpose({ open });
 }
 
 .import-preview {
-    background: #f7f9ff;
-    border: 1px solid #d0d8f0;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     padding: 1rem;
     min-width: 220px;
@@ -609,7 +609,7 @@ defineExpose({ open });
     aspect-ratio: 1 / 1;
     padding: 0.2rem;
     font-size: 0.75rem;
-    border: 1px solid #000;
+    border: 1px solid var(--color-text);
     border-radius: 6px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -617,7 +617,7 @@ defineExpose({ open });
 }
 
 .preview-empty {
-    color: #555;
+    color: var(--color-text-muted);
     font-size: 0.95rem;
     min-height: 160px;
     display: flex;
@@ -628,8 +628,8 @@ defineExpose({ open });
 
 .modal-legend {
     padding: 1rem;
-    background: #f4f7ff;
-    border: 1px solid #d5dcef;
+    background: var(--color-primary-bg);
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     display: flex;
     flex-wrap: wrap;
@@ -648,22 +648,22 @@ defineExpose({ open });
     gap: 0.5rem;
     padding: 0.35rem 0.75rem;
     background: white;
-    border: 1px solid #d0d8f0;
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     margin-bottom: 0;
     white-space: nowrap;
 }
 
 .modal-legend .legend-color.empty-cell {
-    background: #ffffff;
-    border-color: #999;
+    background: var(--color-surface);
+    border-color: var(--color-text-faint);
 }
 
 .legend-title {
     font-size: 0.9rem;
     font-weight: 700;
     margin-bottom: 0.75rem;
-    color: #333;
+    color: var(--color-text);
 }
 
 .legend-row {
@@ -672,14 +672,14 @@ defineExpose({ open });
     gap: 0.75rem;
     margin-bottom: 0.4rem;
     font-size: 0.9rem;
-    color: #333;
+    color: var(--color-text);
 }
 
 .legend-color {
     width: 18px;
     height: 18px;
     border-radius: 4px;
-    border: 1px solid #bbb;
+    border: 1px solid var(--color-text-faint);
     display: inline-block;
 }
 
@@ -687,7 +687,7 @@ defineExpose({ open });
     padding: 1vh 2vw;
     font-size: 1rem;
     cursor: pointer;
-    background-color: #4caf50;
+    background-color: var(--color-success);
     color: white;
     border: none;
     border-radius: 8px;
@@ -697,11 +697,11 @@ defineExpose({ open });
 }
 
 .solve-btn:hover:not(:disabled) {
-    background-color: #45a049;
+    background-color: var(--color-success-hover);
 }
 
 .solve-btn:disabled {
-    background-color: #cccccc;
+    background-color: var(--color-border);
     cursor: not-allowed;
 }
 
@@ -709,7 +709,7 @@ defineExpose({ open });
     padding: 1vh 2vw;
     font-size: 1rem;
     cursor: pointer;
-    background-color: #d32f2f;
+    background-color: var(--color-danger);
     color: white;
     border: none;
     border-radius: 8px;
@@ -720,6 +720,6 @@ defineExpose({ open });
 }
 
 .reset-btn:hover {
-    background-color: #b71c1c;
+    background-color: var(--color-danger);
 }
 </style>

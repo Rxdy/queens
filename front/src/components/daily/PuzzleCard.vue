@@ -40,7 +40,7 @@ const emit = defineEmits(["play"]);
     gap: 8px;
     width: 100%;
     padding: 14px;
-    background: #fff;
+    background: var(--color-surface);
     border: none;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -62,7 +62,7 @@ const emit = defineEmits(["play"]);
 
 .puzzle-card-size {
     font-weight: 700;
-    color: #333;
+    color: var(--color-text);
 }
 
 .puzzle-card-cta {
@@ -71,11 +71,11 @@ const emit = defineEmits(["play"]);
     gap: 4px;
     font-size: 0.85rem;
     font-weight: 600;
-    color: #3730a3;
+    color: var(--color-primary-hover);
 }
 
 .puzzle-card-time {
     font-size: 0.78rem;
-    color: #666;
+    color: var(--color-text-muted);
 }
 </style>

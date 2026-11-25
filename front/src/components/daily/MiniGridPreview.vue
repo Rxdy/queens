@@ -32,8 +32,8 @@ defineProps({
     gap: 1px;
     width: 100%;
     aspect-ratio: 1;
-    background: #222;
-    border: 2px solid #222;
+    background: var(--color-grid-line);
+    border: 2px solid var(--color-text);
     border-radius: 4px;
     overflow: hidden;
 }

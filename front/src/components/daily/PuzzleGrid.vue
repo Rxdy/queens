@@ -74,8 +74,8 @@ const onCellRightClick = (row, col) => emit("toggle-mark", { row, col });
     gap: 2px;
     width: min(90vw, 480px);
     aspect-ratio: 1;
-    background: #000;
-    border: 3px solid #000;
+    background: var(--color-grid-line);
+    border: 3px solid var(--color-text);
     border-radius: 4px;
     box-sizing: border-box;
     overflow: hidden;
@@ -97,7 +97,7 @@ const onCellRightClick = (row, col) => emit("toggle-mark", { row, col });
 }
 
 .puzzle-cell.conflict {
-    outline: 3px solid #e53935;
+    outline: 3px solid var(--color-danger);
     outline-offset: -3px;
     z-index: 1;
 }
