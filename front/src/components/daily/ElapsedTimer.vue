@@ -40,6 +40,6 @@ const elapsedMs = computed(() => (props.startedAt === null ? null : now.value - 
     gap: 4px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    color: #555;
+    color: var(--color-text-muted);
 }
 </style>

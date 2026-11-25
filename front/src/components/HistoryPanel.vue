@@ -59,13 +59,13 @@ const formatTime = (seconds) => {
 
 <style scoped>
 .history-panel {
-    background-color: #ffffff;
+    background-color: var(--color-surface);
     padding: 0;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     max-height: calc(100vh - 6rem);
     overflow-y: auto;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--color-border);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -75,16 +75,16 @@ const formatTime = (seconds) => {
 .history-panel h3 {
     margin: 0;
     padding: 20px;
-    color: #111827;
+    color: var(--color-text);
     font-size: 1.1rem;
     font-weight: 600;
-    border-bottom: 1px solid #e5e7eb;
-    background-color: #f9fafb;
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-surface-alt);
     border-radius: 8px 8px 0 0;
 }
 
 .no-history {
-    color: #6b7280;
+    color: var(--color-text-muted);
     font-style: italic;
     text-align: center;
     padding: 40px 20px;
@@ -100,19 +100,19 @@ const formatTime = (seconds) => {
 .history-entry {
     padding: 16px 20px;
     background-color: white;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--color-border);
     font-size: 14px;
     cursor: pointer;
     transition: background-color 0.15s ease;
 }
 
 .history-entry:hover {
-    background-color: #f3f4f6;
+    background-color: var(--color-surface-alt);
 }
 
 .history-entry.selected {
-    background-color: #dbeafe;
-    border-left: 4px solid #3b82f6;
+    background-color: var(--color-primary-bg);
+    border-left: 4px solid var(--color-primary);
 }
 
 .history-entry:last-child {
@@ -128,22 +128,22 @@ const formatTime = (seconds) => {
 
 .history-entry-title {
     font-weight: 600;
-    color: #111827;
+    color: var(--color-text);
 }
 
 .history-entry-time {
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--color-text-faint);
 }
 
 .history-entry-solutions {
-    color: #6b7280;
+    color: var(--color-text-muted);
     font-size: 13px;
 }
 
 .history-entry-pattern {
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--color-text-faint);
     font-style: italic;
     margin-top: 1px;
 }
@@ -156,13 +156,13 @@ const formatTime = (seconds) => {
 
 .entry-time-trm {
     font-size: 11px;
-    color: #10b981;
+    color: var(--color-success);
     font-weight: 600;
 }
 
 .entry-time-baseline {
     font-size: 11px;
-    color: #f59e0b;
+    color: var(--color-accent);
     font-weight: 600;
 }
 </style>

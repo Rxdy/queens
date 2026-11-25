@@ -51,12 +51,12 @@ const emit = defineEmits(["select", "reset-reached"]);
 
 .daily-picker-header h2 {
     margin: 0;
-    color: #333;
+    color: var(--color-text);
 }
 
 .daily-picker-subtitle {
     margin: 8px 0 20px;
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 0.9rem;
 }
 

@@ -28,12 +28,12 @@ defineProps({
 }
 
 .status-badge.pending {
-    background: #eceff1;
-    color: #455a64;
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
 }
 
 .status-badge.solved {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--color-success-bg);
+    color: var(--color-success);
 }
 </style>

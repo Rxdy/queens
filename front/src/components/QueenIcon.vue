@@ -22,7 +22,7 @@ defineProps({
 
 <style scoped>
 .queen-icon {
-    fill: #000;
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    fill: var(--color-queen);
+    text-shadow: 1px 1px 2px color-mix(in srgb, var(--color-surface) 80%, transparent);
 }
 </style>

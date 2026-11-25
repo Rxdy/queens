@@ -79,7 +79,7 @@ const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
 
 .daily-player-size {
     font-weight: 700;
-    color: #333;
+    color: var(--color-text);
     margin-left: auto;
 }
 
@@ -90,14 +90,14 @@ const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
     padding: 6px 12px;
     border: none;
     border-radius: 8px;
-    background: #eceff1;
-    color: #333;
+    background: var(--color-surface-alt);
+    color: var(--color-text);
     font-weight: 600;
     cursor: pointer;
 }
 
 .back-btn:hover {
-    background: #dde3e6;
+    background: var(--color-surface-alt);
 }
 
 .solved-banner {
@@ -106,8 +106,8 @@ const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
     gap: 6px;
     margin: 0;
     padding: 8px 14px;
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--color-success-bg);
+    color: var(--color-success);
     border-radius: 8px;
     font-size: 0.85rem;
     font-weight: 600;
@@ -115,7 +115,7 @@ const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
 
 .interaction-hint {
     margin: 0;
-    color: #777;
+    color: var(--color-text-faint);
     font-size: 0.8rem;
     text-align: center;
 }
@@ -126,8 +126,8 @@ const emit = defineEmits(["toggle-cell", "toggle-mark", "back"]);
     gap: 6px;
     margin: 0;
     padding: 6px 14px;
-    background: #eef2ff;
-    color: #3730a3;
+    background: var(--color-surface-alt);
+    color: var(--color-primary-hover);
     border-radius: 8px;
     font-size: 0.82rem;
 }

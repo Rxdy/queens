@@ -34,8 +34,8 @@ const label = computed(() => {
     white-space: nowrap;
 }
 
-.level-0 { background: #e8f5e9; color: #2e7d32; }
-.level-1 { background: #e8f0ff; color: #1e3a8a; }
-.level-2 { background: #fff3e0; color: #e65100; }
-.level-3 { background: #ffebee; color: #c62828; }
+.level-0 { background: var(--color-success-bg); color: var(--color-success); }
+.level-1 { background: var(--color-surface-alt); color: var(--color-primary-hover); }
+.level-2 { background: var(--color-soon-bg); color: var(--color-soon); }
+.level-3 { background: var(--color-danger-bg); color: var(--color-danger); }
 </style>

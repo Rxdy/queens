@@ -88,7 +88,7 @@ onMounted(async () => {
     max-width: 900px;
     margin: 0 auto 2vh;
     padding: 1rem 1.2rem;
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     box-sizing: border-box;
@@ -96,18 +96,18 @@ onMounted(async () => {
 
 .global-stats-panel h3 {
     margin: 0 0 0.6rem;
-    color: #333;
+    color: var(--color-text);
 }
 
 .global-stats-status {
-    color: #666;
+    color: var(--color-text-muted);
     font-size: 0.9rem;
     margin: 0;
 }
 
 .global-stats-summary {
     margin: 0 0 1rem;
-    color: #444;
+    color: var(--color-text-muted);
     font-size: 0.92rem;
 }
 
@@ -125,7 +125,7 @@ onMounted(async () => {
 .global-stats-table td {
     padding: 6px 10px;
     text-align: right;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .global-stats-table th:first-child,
@@ -134,7 +134,7 @@ onMounted(async () => {
 }
 
 .global-stats-table th {
-    color: #666;
+    color: var(--color-text-muted);
     font-weight: 600;
 }
 </style>
